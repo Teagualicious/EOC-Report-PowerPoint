@@ -22,3 +22,31 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  release:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build source zip
+        id: zip
+        run: |
+          zip_name="${{ github.event.repository.name }}_$(date +%Y-%m-%d)_r${{ github.run_number }}.zip"
+          zip -r "$zip_name" . \
+            -x '.git/*' \
+            -x 'tests/*' \
+            -x '*/__pycache__/*' \
+            -x '__pycache__/*'
+          echo "zip_name=$zip_name" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          files: ${{ steps.zip.outputs.zip_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
