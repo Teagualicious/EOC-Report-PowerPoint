@@ -11,17 +11,17 @@ Important constants: `PROJECT_ROOT`, `APP_DIR`, `RESOURCE_DIR`, `WORKSPACE_DIR`,
 
 ## config.naming
 
-### `safe_component(value, fallback="item", max_length=120) -> str`
+### `safe_component(value, fallback="untitled", max_length=120) -> str`
 Returns a Windows-safe path component.
 
-### `storage_key(value) -> str`
+### `storage_key(value, *, replace_dots=False) -> str`
 Returns a stable lowercase key for mapping filenames.
 
-### `safe_child(base_dir, component) -> str`
+### `safe_child(base_dir, component, *, fallback="untitled") -> str`
 Returns a safe path beneath `base_dir` and rejects traversal.
 
-### `unique_component(value, used, fallback="item") -> str`
-Creates a collision-safe sanitized component and updates the supplied `used` set.
+### `unique_component(value, used, *, fallback="untitled", max_length=120) -> str`
+Creates a collision-safe sanitized component (case-insensitive) and updates the supplied `used` set.
 
 ## config.settings
 
@@ -132,11 +132,11 @@ Advanced query example:
   "metric": "Impressions",
   "breakdown": "device",
   "filter": "Roku",
-  "agg": "sum",
-  "top_n": "10",
-  "output": "value"
+  "agg": "sum"
 }
 ```
+
+Supported `agg` values: `sum` (default), `avg`/`mean`, `max`, `min`, `count`, `first`.
 
 ## engine.pptx_mapper
 
@@ -155,7 +155,18 @@ Lists templates and mapping status.
 ## engine.pptx_fill
 
 ### `fill_template(template_path, output_path, mapping, metric_values) -> str`
-Performs static text, image, query, and formatting replacement with python-pptx.
+Performs static text, image, query, and formatting replacement with python-pptx. Delegates to `fill_template_report()` and returns only the path.
+
+### `fill_template_report(template_path, output_path, mapping, metric_values) -> tuple[str, FillReport]`
+Like `fill_template`, but also returns a `FillReport` describing what was filled, what was missing, and what failed — including `replace_text` placeholders that no longer exist in the template.
+
+## engine.fill_report
+
+### `FillReport(template_path="", output_path="")`
+Mutable, JSON-friendly per-fill outcome record. Fields: `template`, `output`, `timestamp`, counters `filled`, `images_filled`, `skipped`, `out_of_range`, and lists `missing_metrics`, `unmatched_placeholders`, `missing_images`, `failed_queries`, `errors`. `ok` is True when nothing the user mapped was left unfilled; `summary()` returns the post-fill dialog text; `to_dict()` returns the JSON form.
+
+### `append_fill_history(report) -> str | None`
+Appends one JSON line per fill to `workspace/logs/fill_history.jsonl`. Best-effort: failures are logged and swallowed.
 
 ## engine.pptx_formats
 
@@ -176,15 +187,18 @@ Windows COM live-preview controller.
 Important methods:
 
 - `is_active()`
+- `get_health()`
 - `go_to_slide(slide_num)`
-- `export_slide_image(slide_num, output_path=None, width=960)`
-- `update_shape_text(slide_num, shape_index, new_text, replace_portion=None)`
+- `export_slide_image(slide_num, output_path=None, width=800)`
+- `update_shape_text(slide_num, shape_index, new_text, replace_portion=None, expected_name=None)`
 - `restore_shape_text(slide_num, shape_index)`
 - `replace_shape_with_image(slide_num, shape_index, image_path)`
 - `update_chart_data(slide_num, shape_index, data_dict)`
 - `update_table_data(slide_num, shape_index, data_dict)`
 - `save_as(output_path)`
 - `cleanup()`
+
+Public COM methods are health-tracked: after `MAX_CONSECUTIVE_FAILURES` (3) consecutive failures the preview disables itself, fires the optional `on_disabled` callback once, and static fill proceeds through python-pptx. `get_health()` returns call/failure counters, the last failed operation, the disabled reason, and `active`.
 
 ## engine.template_bundle
 
@@ -235,3 +249,9 @@ Validates and installs a bundle, returning `(template_name, image_count)`.
   }
 }
 ```
+
+Notes:
+
+- An assignment may also carry a `"query"` dictionary (see `engine.query_resolver`); `fill_template` resolves it when the metric key is not already in `metric_values`.
+- `image_path` is stored relative to the project root for portability; `image_path_abs` keeps the absolute path for the current session.
+- Older mappings may store a single assignment's fields (`metric`, `format`, `replace_text`, `format_details`, `query`) directly on the shape entry instead of in `assignments`; readers still honor that form.

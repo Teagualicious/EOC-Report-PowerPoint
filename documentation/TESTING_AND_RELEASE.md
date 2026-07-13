@@ -5,16 +5,18 @@
 Run from the project root:
 
 ```bash
-python -m pip install -r app/requirements.txt
-python -m compileall -q app developer/tests
-python -m pytest developer/tests -q
+python -m pip install -r requirements.txt
+python -m compileall -q app tests
+python -m pytest tests -q
 ```
 
-Expected result for the July 10, 2026 handoff build:
+Expected result for the current build:
 
 ```text
-171 passed
+221 passed
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the same suite on every push and pull request (Python 3.12, Ubuntu).
 
 ## What automated tests cover
 
@@ -31,6 +33,8 @@ Expected result for the July 10, 2026 handoff build:
 - query resolution
 - safe names and collision handling
 - template bundle import/export and malicious archive cases
+- fill report summaries and `fill_history.jsonl` telemetry
+- live-preview COM health tracking and python-pptx fallback
 - root input/output layout migration and prior-default settings normalization
 - headless parse-to-export smoke workflows
 
@@ -77,7 +81,9 @@ Use a Windows 10/11 machine with current desktop Excel and PowerPoint.
 - Replace an image and confirm geometry is preserved.
 - Save mapping, restart the application, and auto-fill with a different client.
 - Test one table, one ordinary chart, and one multi-series comparison chart.
-- Close PowerPoint unexpectedly and verify the app logs the issue and remains recoverable.
+- Confirm Save & Fill and Auto-Fill dialogs show the fill summary, a mapping with gaps shows "Report Generated — With Gaps", and `workspace/logs/fill_history.jsonl` gains a line per fill.
+- Close PowerPoint unexpectedly and verify a single "Live Preview Off" notice appears, the mapper stays usable, and Save & Fill produces the report via the built-in engine.
+- Run the full mapper-reliability drill in `reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md` if any of the above checks fail or the fill/preview code has changed.
 
 ### Template bundles
 

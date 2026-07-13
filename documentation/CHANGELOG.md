@@ -1,5 +1,30 @@
 # Changelog
 
+## July 13, 2026 - Repository integration
+
+- Merged the inherited IngestionEngine codebase into the Jughead-Data-Engine
+  GitHub repository; the project now lives at the repository root instead of
+  an `IngestionEngine/` folder.
+- Moved the pytest suite from `developer/tests/` to root `tests/` per repo
+  standards; test command is now `python -m pytest tests -q` from the root.
+- Added a root `requirements.txt` (runtime deps from `app/requirements.txt`
+  plus pytest) so `pip install -r requirements.txt && pytest` works anywhere;
+  the Windows launcher still installs from `app/requirements.txt`. pywin32
+  gained a `sys_platform == "win32"` marker so Linux CI installs cleanly.
+- GitHub Actions CI now runs the suite on every push and pull request.
+- Removed the generated USER_GUIDE.pdf and TECHNICAL_GUIDE.pdf; the markdown
+  guides are canonical.
+- Refreshed all current documentation against the code (test counts, paths,
+  layout diagrams, fill-report/preview-health coverage) and regenerated
+  PROJECT_MANIFEST.json.
+- Extended the fill-engine golden suite with 7 characterization tests:
+  workspace-relative and `image_path_abs` image fallbacks, corrupt-image
+  error isolation, image-over-text assignment precedence, date-styled
+  `format_details`, mixed matched/unmatched placeholders on one shape, and
+  the silent no-op for text assignments on shapes without a text frame.
+- 221 automated tests pass (212 inherited + 2 repository smoke tests +
+  7 new golden tests).
+
 ## July 12, 2026 - Mapper success/failure tracking + golden-file safety net
 
 - Added a golden-file characterization suite for the previously untested fill

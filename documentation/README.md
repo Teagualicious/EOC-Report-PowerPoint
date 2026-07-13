@@ -4,10 +4,10 @@ This directory is organized so the current implementation is clearly separated f
 
 ## Current documentation
 
-0. **`../AI_CONTEXT.md`** - AI-specific design constraints, pitfalls, preferred patterns, and definition of done. Read this first when using an AI assistant.
-1. **USER_GUIDE.md / USER_GUIDE.pdf** - end-user installation, monthly workflow, Excel search, PowerPoint mapping, storage, and troubleshooting.
+0. **`../AI_CONTEXT.md`** - AI-specific design constraints, pitfalls, preferred patterns, and definition of done. Read this first when using an AI assistant. Repository session workflow (read `STATUS.md` first, tests before done, data hygiene) is governed by root `CLAUDE.md` and `STATUS.md`.
+1. **USER_GUIDE.md** - end-user installation, monthly workflow, Excel search, PowerPoint mapping, storage, and troubleshooting.
 2. **MODEL_HANDOFF.md** - the authoritative continuation document for another engineer or model. Read this first for development work.
-3. **TECHNICAL_GUIDE.md / TECHNICAL_GUIDE.pdf** - system behavior, data pipeline, persistence, Excel and PowerPoint integrations, and security controls.
+3. **TECHNICAL_GUIDE.md** - system behavior, data pipeline, persistence, Excel and PowerPoint integrations, and security controls.
 4. **CURRENT_ARCHITECTURE.md** - current repository and module structure.
 5. **API_REFERENCE.md** - important functions, classes, schemas, and mapping formats.
 6. **TESTING_AND_RELEASE.md** - automated test commands and Windows acceptance checklist.

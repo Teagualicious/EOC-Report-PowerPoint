@@ -1,8 +1,8 @@
 # AI Context — Spectrum Reach Reporting Ingestion Engine
 
 **Purpose:** Fast, reliable orientation for an AI assistant making changes to this repository.  
-**Authoritative state:** July 10, 2026  
-**Read next:** `documentation/MODEL_HANDOFF.md` for the detailed system handoff.
+**Authoritative state:** July 13, 2026  
+**Read next:** `documentation/MODEL_HANDOFF.md` for the detailed system handoff. For repo session workflow (read `STATUS.md` first, tests as the completion gate, synthetic fixtures only), follow root `CLAUDE.md` and `STATUS.md`.
 
 ## 1. Project intent
 
@@ -20,16 +20,20 @@ The product priorities, in order, are:
 ## 2. Current repository boundaries
 
 ```text
-IngestionEngine/
+Jughead-Data-Engine/
 |-- AI_CONTEXT.md                  AI-specific orientation (this file)
+|-- CLAUDE.md                      Repo session rules
+|-- STATUS.md                      Current project state; read first each session
 |-- README.md                      User/developer starting point
+|-- requirements.txt               Dev/CI install (pulls in app/requirements.txt plus pytest)
 |-- Start Ingestion Engine.bat     Normal Windows launcher
 |-- app/                           Application code and bundled resources
 |-- input/                         User-facing source-file staging
 |-- output/                        Default generated-report destination
 |-- workspace/                     Writable settings, mappings, templates, logs
 |-- documentation/                 Current guides and historical archive
-`-- developer/                     Tests, build configuration, tools
+|-- tests/                         Pytest suite (synthetic fixtures only)
+`-- developer/                     Build configuration and tools
 ```
 
 Respect these boundaries:
@@ -38,6 +42,7 @@ Respect these boundaries:
 - `input/` and `output/` are intentionally at the root for convenient File Explorer access.
 - `workspace/` is application-managed state. Do not put source modules or user reports there.
 - `documentation/archive/` is historical context, not current truth.
+- `tests/` uses synthetic fixtures only (see `tests/fixtures/`); never real client data.
 - `developer/` is not required for a normal end-user run.
 
 All runtime paths must come from `app/config/paths.py`. Do not add ad-hoc `__file__`, current-working-directory, or hard-coded absolute paths.
@@ -47,13 +52,13 @@ All runtime paths must come from `app/config/paths.py`. Do not add ad-hoc `__fil
 From the project root:
 
 ```bash
-python -m pip install -r app/requirements.txt
+python -m pip install -r requirements.txt
 python app/main.py
-python -m pytest developer/tests -q
-python -m compileall -q app developer/tests
+python -m pytest tests -q
+python -m compileall -q app tests
 ```
 
-Current verified baseline: **171 tests pass**.
+Current verified baseline: **221 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
 
 For Windows releases, also complete the Office acceptance checks in `documentation/TESTING_AND_RELEASE.md`. Linux/macOS test success does not validate Excel VBA injection or PowerPoint COM behavior.
 
@@ -64,6 +69,7 @@ For Windows releases, also complete the Office acceptance checks in `documentati
 - `app/main.py` — startup, logging, DPI awareness, exception hooks, directory creation, UI launch.
 - `app/config/paths.py` — sole source of path constants and legacy-layout migration.
 - `app/config/settings.py` — atomic settings/platform-config persistence.
+- `app/config/logging_setup.py` — rotating-file logging to `workspace/logs/`; owns all handlers.
 - `app/config/naming.py` — safe, collision-resistant filesystem names.
 - `app/config/themes.py` — light/dark design tokens.
 
@@ -81,13 +87,18 @@ For Windows releases, also complete the Office acceptance checks in `documentati
 - `app/engine/kpi.py` — review totals.
 - `app/engine/metrics_catalog.py` — values exposed to PowerPoint mapping.
 - `app/engine/excel_writer.py` — workbook generation and merge/re-export behavior.
+- `app/engine/excel_utils.py` — UI-free normalization/collection/pivot helpers for the Excel writer.
 - `app/engine/excel_search_dashboard.py` — Search sheet and hidden index/config sheets.
 - `app/engine/excel_vba.py` + `app/engine/vba_src/modSearch.bas` — Windows Excel enhancement.
 - `app/engine/query_resolver.py` — advanced metric selection/filtering.
-- `app/engine/pptx_fill.py` — static `python-pptx` output.
-- `app/engine/pptx_live.py` — Windows COM preview and complex PowerPoint updates.
+- `app/engine/pptx_mapper.py` — template scanning and mapping storage; re-exports the fill/format/catalog companions.
+- `app/engine/pptx_fill.py` — static `python-pptx` output; `fill_template_report()` returns `(path, report)`.
+- `app/engine/fill_report.py` — fill telemetry: `FillReport` (missing metrics, unmatched `replace_text` placeholders, missing images) appended to `workspace/logs/fill_history.jsonl`.
+- `app/engine/pptx_live.py` — Windows COM preview and complex PowerPoint updates; tracks COM health and self-disables after 3 consecutive failures, falling back to the `python-pptx` engine.
+- `app/engine/pptx_thumbs.py` — cached slide-1 template previews (COM PNG on Windows, text summary fallback).
 - `app/engine/pptx_formats.py` — shared formatting behavior.
 - `app/engine/template_bundle.py` — safe template import/export ZIP handling.
+- `app/engine/errors.py` — structured application errors with user-safe messages.
 
 ### UI
 
@@ -207,7 +218,7 @@ Before claiming a speed improvement, benchmark representative CSV and XLSX files
 
 ## 11. Coding conventions
 
-- Target Python 3.10+.
+- Target Python 3.11+ (CI runs 3.12).
 - Use descriptive names and small focused functions.
 - Add type hints to new public functions where practical.
 - Catch specific exceptions; do not hide unexpected failures with broad silent `except` blocks.
@@ -227,13 +238,13 @@ Update as applicable:
 - `documentation/MODEL_HANDOFF.md` — authoritative implementation handoff.
 - `documentation/CURRENT_ARCHITECTURE.md` — repository/module structure.
 - `documentation/API_REFERENCE.md` — public contracts and schemas.
-- `documentation/USER_GUIDE.md` and PDF — user-visible workflow.
-- `documentation/TECHNICAL_GUIDE.md` and PDF — technical behavior.
+- `documentation/USER_GUIDE.md` — user-visible workflow.
+- `documentation/TECHNICAL_GUIDE.md` — technical behavior.
 - `documentation/TESTING_AND_RELEASE.md` — commands/acceptance tests.
 - `documentation/CHANGELOG.md` — meaningful released changes.
 - `documentation/PROJECT_MANIFEST.json` — commands, status, critical docs, hashes.
 
-Do not edit generated PDFs without updating their Markdown source first.
+The generated PDF guides were removed; the Markdown files are canonical.
 
 ## 13. Preferred change workflow for an AI assistant
 

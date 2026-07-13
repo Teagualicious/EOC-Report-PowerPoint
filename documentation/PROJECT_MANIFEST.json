@@ -1,7 +1,7 @@
 {
   "project": "Spectrum Reach Reporting Ingestion Engine",
-  "state_date": "2026-07-10",
-  "handoff_build": "windows-ui-photo-fixes",
+  "state_date": "2026-07-13",
+  "handoff_build": "repo-integration-fill-tracking",
   "entrypoint": "app/main.py",
   "windows_launcher": "Start Ingestion Engine.bat",
   "python": "3.10+",
@@ -15,9 +15,9 @@
   "unsupported_inputs": {
     ".xls": "Save as .xlsx before import"
   },
-  "test_command": "python -m pytest developer/tests -q",
-  "compile_command": "python -m compileall -q app developer/tests",
-  "verified_test_result": "171 passed",
+  "test_command": "python -m pytest tests -q",
+  "compile_command": "python -m compileall -q app tests",
+  "verified_test_result": "221 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -26,7 +26,8 @@
     "default_output": "output/",
     "application_state": "workspace/",
     "documentation": "documentation/",
-    "tests_and_build": "developer/"
+    "tests": "tests/",
+    "build_and_tools": "developer/"
   },
   "critical_docs": [
     "AI_CONTEXT.md",
@@ -43,10 +44,18 @@
     "pandas": "3.0.3",
     "pillow": "12.3.0",
     "python-pptx": "1.0.2",
-    "pywin32": "312",
+    "pywin32": "312; sys_platform == \"win32\"",
     "tkcalendar": "1.6.1"
   },
   "modules": [
+    {
+      "path": "app/main.py",
+      "lines": 85,
+      "public_symbols": [
+        "main"
+      ],
+      "sha256": "1e0101af71930f314b400996f59f408098351f73979fb2f6e9f7b1d67cc501f6"
+    },
     {
       "path": "app/config/__init__.py",
       "lines": 0,
@@ -57,6 +66,7 @@
       "path": "app/config/logging_setup.py",
       "lines": 40,
       "public_symbols": [
+        "LOG_FILE",
         "setup_logging"
       ],
       "sha256": "e4940d18ba67f3b4b2c3da73bd50f1e517a78953e76695cf6d35bcd38de72e2c"
@@ -76,6 +86,17 @@
       "path": "app/config/paths.py",
       "lines": 128,
       "public_symbols": [
+        "APP_ROOT",
+        "WORKSPACE_DIR",
+        "DICT_PATH",
+        "LOGO_PATH",
+        "SETTINGS_PATH",
+        "MAPPINGS_DIR",
+        "TEMPLATES_DIR",
+        "IMAGES_DIR",
+        "LOGS_DIR",
+        "INPUT_DIR",
+        "OUTPUT_DIR",
         "migrate_legacy_layout",
         "ensure_dirs"
       ],
@@ -85,6 +106,7 @@
       "path": "app/config/settings.py",
       "lines": 105,
       "public_symbols": [
+        "DEFAULT_UNCHECKED",
         "load_settings",
         "save_settings",
         "load_platform_config",
@@ -97,6 +119,7 @@
       "path": "app/config/themes.py",
       "lines": 35,
       "public_symbols": [
+        "THEMES",
         "get_theme"
       ],
       "sha256": "cf89328d0f0dea8fa03d8380f4da094c7686752e3786c49cc02f9da4041424ba"
@@ -130,6 +153,20 @@
       "path": "app/engine/excel_search_dashboard.py",
       "lines": 332,
       "public_symbols": [
+        "NAVY",
+        "BLUE",
+        "LIGHT",
+        "BANNER_TEXT",
+        "HINT_ON_NAVY",
+        "SEARCH_CELL",
+        "BTN_CELL",
+        "DATE_START_CELL",
+        "DATE_END_CELL",
+        "CHIP_START",
+        "CHIP_END",
+        "SUGGEST_ROW",
+        "RESULTS_START_ROW",
+        "COPY_CELL",
         "build_search_index_rows",
         "build_config_rows",
         "build_search_dashboard"
@@ -139,7 +176,12 @@
     {
       "path": "app/engine/excel_utils.py",
       "lines": 177,
-      "public_symbols": [],
+      "public_symbols": [
+        "SCHEMA_COLUMNS",
+        "KEY_COLUMNS",
+        "DISPLAY_NAMES",
+        "TOP_N"
+      ],
       "sha256": "9d34a026cb4121f66d7f420e6cef975e2c2516d2ba9a5f0ccaf86de321eee8e7"
     },
     {
@@ -148,6 +190,11 @@
       "public_symbols": [
         "VBAInjectionError",
         "VBA_MOD_SEARCH",
+        "VBA_SHEET_SEARCH",
+        "VBA_FORM_CALENDAR",
+        "VBA_CLASS_DAYBTN",
+        "VBA_FORM_CALENDAR_DECLS",
+        "VBA_FORM_CALENDAR_WIRING",
         "inject_search_vba"
       ],
       "sha256": "dfe06baf4117ea982670be590470b8bf1511dcdd3fdc79d6b93fb369ce74a256"
@@ -156,14 +203,50 @@
       "path": "app/engine/excel_writer.py",
       "lines": 172,
       "public_symbols": [
+        "NAVY",
+        "LIGHT_BLUE",
+        "MED_BLUE",
+        "LIGHT_GRAY",
+        "MED_GRAY",
+        "DARK_TEXT",
+        "MUTED_TEXT",
+        "HEADER_FILL",
+        "HEADER_FONT",
+        "DATA_FONT",
+        "SECTION_FILL",
+        "SECTION_FONT",
+        "CAMPAIGN_HDR_FILL",
+        "CAMPAIGN_HDR_FONT",
+        "TOTAL_FILL",
+        "TOTAL_FONT",
+        "ALT_ROW_FILL",
+        "TITLE_FONT",
+        "SUBTITLE_FONT",
+        "THIN_BORDER",
+        "CR_HEADER_FILL",
+        "CR_TITLE_FONT",
+        "CR_DATE_FONT",
+        "MANAGED_SHEETS",
         "write_to_excel"
       ],
       "sha256": "9edf938928529026f349668d6eeca4f4931709e0b686333f97b365317a98f936"
     },
     {
+      "path": "app/engine/fill_report.py",
+      "lines": 146,
+      "public_symbols": [
+        "FILL_HISTORY_NAME",
+        "FillReport",
+        "append_fill_history"
+      ],
+      "sha256": "beef6fedd39a23cb1bf3b49ad695b0fbdddd9c72c7bd26ae1c38d2045c783f55"
+    },
+    {
       "path": "app/engine/kpi.py",
       "lines": 121,
       "public_symbols": [
+        "KPI_METRICS",
+        "KPI_ALIASES",
         "compute_kpis"
       ],
       "sha256": "c746b25a2e135d85f3786cc01503a8918acf9d649df7918ecc6e14dbc55562fd"
@@ -172,22 +255,25 @@
       "path": "app/engine/metrics_catalog.py",
       "lines": 184,
       "public_symbols": [
+        "SPECIAL_METRICS",
         "get_available_metrics"
       ],
       "sha256": "eadf814d505712967b99d4a5b0f43b4d0076ff2b5ba98b8b328d7ee3feeb1552"
     },
     {
       "path": "app/engine/pptx_fill.py",
-      "lines": 216,
+      "lines": 246,
       "public_symbols": [
-        "fill_template"
+        "fill_template",
+        "fill_template_report"
       ],
-      "sha256": "bae2504c1bde218042dab4938e73b8ecad1145e142fdf54a3da96d9edc6c4b2b"
+      "sha256": "924e00ce98e95874942c6c615396a1b89a6d9a27a926205deaed10950a3b285d"
     },
     {
       "path": "app/engine/pptx_formats.py",
       "lines": 300,
       "public_symbols": [
+        "DATE_STYLE_CHOICES",
         "format_date_with_style",
         "format_with_details"
       ],
@@ -195,11 +281,11 @@
     },
     {
       "path": "app/engine/pptx_live.py",
-      "lines": 572,
+      "lines": 645,
       "public_symbols": [
         "PPTXLivePreview"
       ],
-      "sha256": "d8c8da4e0f721e2716a7f66d023aa6ab2fdceeca28aaf11761572d277de7ed91"
+      "sha256": "90fe6d999ebc1c014f9fffef9f7fae34cd3133d8745564b430c4fb7048d77721"
     },
     {
       "path": "app/engine/pptx_mapper.py",
@@ -216,6 +302,7 @@
       "path": "app/engine/pptx_thumbs.py",
       "lines": 119,
       "public_symbols": [
+        "THUMBS_DIR",
         "get_template_thumbnail",
         "get_template_preview"
       ],
@@ -225,6 +312,7 @@
       "path": "app/engine/query_resolver.py",
       "lines": 251,
       "public_symbols": [
+        "SIMPLE_OPTIONS",
         "build_simple_options",
         "resolve_query",
         "get_available_breakdowns"
@@ -235,18 +323,11 @@
       "path": "app/engine/template_bundle.py",
       "lines": 195,
       "public_symbols": [
+        "FORMAT_NAME",
         "export_template_bundle",
         "import_template_bundle"
       ],
       "sha256": "66f8d42e46b071ccf6f7c9eebaa2706af1cf9aaf187070153ce10e6110e55b40"
-    },
-    {
-      "path": "app/main.py",
-      "lines": 85,
-      "public_symbols": [
-        "main"
-      ],
-      "sha256": "1e0101af71930f314b400996f59f408098351f73979fb2f6e9f7b1d67cc501f6"
     },
     {
       "path": "app/mapper/__init__.py",
@@ -264,11 +345,11 @@
     },
     {
       "path": "app/mapper/mapper_window.py",
-      "lines": 321,
+      "lines": 350,
       "public_symbols": [
         "PPTXWizard"
       ],
-      "sha256": "9b404139a9ad368e8ad853921339d970eb0e0c7093c1c5ef2f6effcab414c17a"
+      "sha256": "14773140fab7026876278cbf6f49d525a3eeb3de2bbcd45138527154957a8bec"
     },
     {
       "path": "app/mapper/query_builder.py",
@@ -337,6 +418,7 @@
       "path": "app/parsers/html_parser.py",
       "lines": 303,
       "public_symbols": [
+        "FINGERPRINT_DIR",
         "HTMLParser"
       ],
       "sha256": "815c28bc764bccd5cc1bc7d560c02b55df9466af3334021907831615efc5b2b1"
@@ -373,11 +455,11 @@
     },
     {
       "path": "app/ui/review_view.py",
-      "lines": 437,
+      "lines": 442,
       "public_symbols": [
         "ReviewMixin"
       ],
-      "sha256": "c58d55264004622285349a59f7dd93e948822e5c41c4f49bc978d1305e4bcb78"
+      "sha256": "24d5efac63aa64fb821155a05d0c28c89035c1c66aaada2ff2ffa9aa28089e32"
     },
     {
       "path": "app/ui/settings_window.py",

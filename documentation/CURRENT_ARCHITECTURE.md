@@ -1,6 +1,6 @@
 # Current Architecture
 
-This document describes the implementation in the reorganized July 10, 2026 build. The similarly named file in `archive/` is an old refactor specification and is not current.
+This document describes the implementation in the reorganized July 2026 build, including the July 12 mapper-reliability work (fill reports and live-preview health tracking; see `reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`). The similarly named file in `archive/` is an old refactor specification and is not current.
 
 ## System overview
 
@@ -34,11 +34,14 @@ output/                         Default report output
 workspace/
 |-- templates/              Saved PPTX files and images
 |-- mappings/               Platform and PPTX JSON mappings
-|-- logs/                   Rotating logs
+|-- logs/                   Rotating logs and fill_history.jsonl
 `-- settings.json           Generated user preferences
 
+tests/                          Pytest suite
+
+documentation/                  Markdown docs (this file, API reference, ...)
+
 developer/
-|-- tests/                  Pytest suite
 |-- build/                  PyInstaller spec
 `-- tools/                  Portable dependency installer
 ```
@@ -60,6 +63,7 @@ developer/
 - `parsers.excel_parser` streams XLSX/XLSM worksheets and bounds header detection.
 - `parsers.html_parser` scans metric-only dashboards and table-based reports and stores structure fingerprints.
 - `engine.data_pipeline` applies saved platform column roles and filters parsed data by campaign.
+- `engine.errors` defines the shared exception types (`IngestionError`, `ParserError`) with user-safe messages for the UI.
 
 ### Excel
 
@@ -79,8 +83,9 @@ developer/
 
 - `engine.pptx_mapper` scans templates and persists mappings.
 - `engine.pptx_formats` is the single formatting authority.
-- `engine.pptx_fill` performs static python-pptx replacements.
-- `engine.pptx_live` performs live COM preview and advanced shape/chart/table operations.
+- `engine.pptx_fill` performs static python-pptx replacements and reports fill outcomes, including unmatched placeholders.
+- `engine.fill_report` records per-fill outcomes (`FillReport`) and appends them to `workspace/logs/fill_history.jsonl`.
+- `engine.pptx_live` performs live COM preview and advanced shape/chart/table operations; it tracks COM health and disables itself after three consecutive failures, leaving static fill to python-pptx.
 - `engine.pptx_thumbs` caches template thumbnails.
 - `engine.template_bundle` imports and exports portable mapped-template ZIP files.
 

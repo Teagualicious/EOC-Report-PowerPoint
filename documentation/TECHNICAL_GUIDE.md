@@ -2,13 +2,13 @@
 
 ## Technical Guide
 
-**Updated:** July 10, 2026
+**Updated:** July 13, 2026
 
 ## 1. Purpose and runtime
 
 The application is a Python 3.10+ Tkinter desktop system for campaign-export ingestion, metric normalization, Excel report generation, and PowerPoint template automation.
 
-Primary dependencies are pandas, NumPy, openpyxl, Beautiful Soup, python-pptx, Pillow, tkcalendar, and pywin32. Package versions are pinned in `app/requirements.txt`.
+Primary dependencies are pandas, NumPy, openpyxl, Beautiful Soup, python-pptx, Pillow, tkcalendar, and pywin32. Package versions are pinned in `app/requirements.txt`; pywin32 carries a `; sys_platform == "win32"` marker so non-Windows installs skip it. Development and CI installs use the root `requirements.txt`, which includes `app/requirements.txt` plus pytest.
 
 ## 2. Startup lifecycle
 
@@ -59,7 +59,7 @@ Settings and mapping writes use a temporary file plus `os.replace()` to prevent 
 }
 ```
 
-Platform mappings are separate JSON files under `workspace/mappings/`. This keeps large column-role definitions out of the general settings file.
+Platform mappings are separate JSON files under `workspace/mappings/`, named `platform_<key>.json` where the key comes from `config.naming.storage_key()`. This keeps large column-role definitions out of the general settings file.
 
 ## 5. Metric dictionary
 
@@ -146,7 +146,7 @@ For ratio metrics:
 
 ## 10. Excel generation
 
-`write_to_excel()` reads an existing report when present, captures Unified Data rows, removes managed sheets, rebuilds the current report data, and saves the workbook.
+`write_to_excel()` reads an existing report when present, captures Unified Data rows, removes managed sheets, rebuilds the current report data, and saves the workbook. On an XLSM re-export the Search sheet is kept so its VBA code-behind survives, and an export aimed at a `.xlsx` path is redirected to an existing same-name `.xlsm`.
 
 Managed sheets:
 
@@ -160,7 +160,7 @@ The Unified Data sheet is an Excel table with filters, row banding, widths, form
 
 ### VBA injection
 
-On Windows, `excel_vba.inject_search_vba()` opens Excel through COM, injects `engine/vba_src/modSearch.bas`, adds an ActiveX search box and calendar form, adds a Workbook_Open handler, and saves as XLSM.
+On Windows, `excel_vba.inject_search_vba()` opens Excel through COM, injects `engine/vba_src/modSearch.bas`, a runtime-built calendar UserForm with a day-button relay class, and Search-sheet event handlers, adds an ActiveX search box, and saves as XLSM.
 
 VBA injection is recoverable. If it fails, the normal XLSX remains and the UI reports the reason.
 
@@ -178,7 +178,9 @@ Mappings are stored by template filename. Text assignments can target a full sha
 - date-format detection and rendering
 - text case matching
 
-Static fill uses python-pptx. Live preview uses COM and a working copy. Image replacement preserves shape geometry.
+Static fill uses python-pptx. `pptx_fill.fill_template_report()` returns `(path, report)`, where the `engine.fill_report.FillReport` records filled assignments, missing metrics, unmatched `replace_text` placeholders, missing images, and failed queries; `fill_template()` keeps its original signature. The mapper shows the report summary after every fill and appends each report as one JSON line to `workspace/logs/fill_history.jsonl`.
+
+Live preview uses COM and a working copy, with health tracking on every COM call: after 3 consecutive failures the preview disables itself, fires a one-time `on_disabled` notice, and Save & Fill falls back to the python-pptx engine; a success resets the counter. Image replacement preserves shape geometry.
 
 ## 12. Query engine
 
@@ -208,7 +210,7 @@ template/<template-name>.pptx
 images/<referenced files>
 ```
 
-The importer validates format/version, safe filenames, path traversal, total file count, expanded size, duplicate image names, and mapping references. Extraction is controlled and the final template write is atomic.
+The importer validates format/version, safe filenames, path traversal (absolute or `..`/`.` archive paths are rejected), total file count (500 maximum), expanded size (500 MB maximum), duplicate image names, and mapping references. Extraction is controlled and the final template write is atomic.
 
 ## 14. UI and threading
 
@@ -222,6 +224,7 @@ UI code must not call Tk APIs from the worker function.
 - Per-file parse failures can be skipped while valid files continue.
 - Unhandled Python and Tk callback exceptions are logged with tracebacks and shown in an error dialog.
 - Logs are written to `workspace/logs/ingestion_engine.log`, rotate at 1 MB, and retain three backups.
+- Each PowerPoint fill appends an outcome record to `workspace/logs/fill_history.jsonl` (best-effort; a broken history file never blocks report generation).
 - COM failures are logged and should degrade gracefully.
 
 ## 16. Security and filesystem safety
@@ -235,13 +238,13 @@ UI code must not call Tk APIs from the worker function.
 
 ## 17. Automated validation
 
-The current suite contains 171 passing tests. It covers pure data/business behavior, document generation that can be tested without Office, Windows DPI sizing helpers, and PowerPoint template-preview fallbacks.
+The current suite contains 221 passing tests in `tests/` at the repo root. It covers pure data/business behavior, document generation that can be tested without Office, Windows DPI sizing helpers, PowerPoint template-preview fallbacks, fill-outcome reporting, and live-preview health tracking.
 
-Run:
+Run from the repo root:
 
 ```bash
-python -m compileall -q app developer/tests
-python -m pytest developer/tests -q
+python -m compileall -q app tests
+python -m pytest tests -q
 ```
 
 See `TESTING_AND_RELEASE.md` for the Windows Office acceptance pass.

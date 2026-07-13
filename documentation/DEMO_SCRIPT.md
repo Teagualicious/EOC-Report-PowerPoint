@@ -13,7 +13,7 @@
 
 ### 1. Introduce the folder and privacy model
 
-Show the clean root layout: source exports in `input/`, generated reports in `output/`, program code in `app/`, application state in `workspace/`, documentation in `documentation/`, and developer material in `developer/`. Explain that campaign data stays local.
+Show the clean root layout: source exports in `input/`, generated reports in `output/`, program code in `app/`, application state in `workspace/`, documentation in `documentation/`, automated tests in `tests/`, and developer material in `developer/`. Explain that campaign data stays local.
 
 ### 2. Launch and add files
 
@@ -53,5 +53,5 @@ Show `documentation/USER_GUIDE.md` and `workspace/logs/ingestion_engine.log`. Ex
 |---|---|
 | App does not launch | Run `python app/main.py` from a terminal and inspect `workspace/logs/ingestion_engine.log`. |
 | Excel VBA injection is blocked | Open the generated XLSX and demonstrate Unified Data; explain the required Trust Center setting. |
-| PowerPoint live preview is unavailable | Use static mapper mode and Save & Fill. |
+| PowerPoint live preview is unavailable or fails mid-demo | Continue in static mapper mode; after repeated preview errors the app shows one "Live Preview Off" notice and Save & Fill uses the built-in fill engine automatically. |
 | Source export fails | Use a known-good sample and show the per-file error handling. |

@@ -48,6 +48,9 @@ Use this checklist for focused UI verification. The broader release checklist is
 - [ ] Advanced Query can create value, table, and chart assignments.
 - [ ] Save Mapping persists after restart.
 - [ ] Auto-fill works for a different client and period.
+- [ ] Save & Fill and Auto-Fill dialogs show the fill summary; a fill with gaps uses the "Report Generated — With Gaps" warning.
+- [ ] Each fill appends a line to `workspace/logs/fill_history.jsonl`.
+- [ ] Killing PowerPoint during live preview shows one "Live Preview Off" notice, the mapper stays usable, and Save & Fill falls back to the built-in engine (full drill in `reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`).
 - [ ] Template selector shows either a slide thumbnail or text fallback and keeps all three action buttons visible.
 
 ## Error paths

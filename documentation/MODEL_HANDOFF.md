@@ -1,6 +1,6 @@
 # Model and Developer Handoff Guide
 
-**Authoritative state date:** July 10, 2026  
+**Authoritative state date:** July 13, 2026  
 **Project:** Spectrum Reach Reporting Ingestion Engine  
 **Runtime:** Python 3.10+ desktop application using Tkinter  
 **Primary platform:** Windows 10/11 with Microsoft Excel and PowerPoint
@@ -11,34 +11,42 @@ For AI-assisted work, read root `AI_CONTEXT.md` first, then use this document as
 
 The reviewed and reorganized build is healthy:
 
-- 171 automated tests pass with `python -m pytest developer/tests -q`.
+- 221 automated tests pass with `python -m pytest tests -q`.
 - All Python files compile.
 - The Tkinter application launches successfully in a graphical smoke test.
 - Parsing and Excel generation run in background threads so the UI remains responsive.
 - Large-file import performance, duplicate-export behavior, metric aggregation, filename safety, and template-bundle validation were hardened in the July 10, 2026 review.
+- The July 12, 2026 mapper-reliability work added fill reporting (`engine.fill_report.FillReport` plus `workspace/logs/fill_history.jsonl` telemetry) and live-preview health tracking with automatic fallback to the python-pptx engine. See `reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md` for the authoritative summary.
+- GitHub Actions CI (`.github/workflows/ci.yml`) runs the test suite on every push and pull request (Python 3.12, ubuntu).
 - The only materially unverified area is the Windows-only Office automation path: Excel VBA injection and PowerPoint COM live preview/fill must be acceptance-tested on Windows with Office installed.
 
 Do not treat documents in `documentation/archive/` as current implementation documentation.
 
 ## 2. How to run and test
 
-From the project root:
+From the repository root:
 
 ```bash
-python -m pip install -r app/requirements.txt
+python -m pip install -r requirements.txt
 python app/main.py
-python -m pytest developer/tests -q
-python -m compileall -q app developer/tests
+python -m pytest tests -q
+python -m compileall -q app tests
 ```
 
-On Windows, normal users launch with `Start Ingestion Engine.bat`.
+The root `requirements.txt` pulls in `app/requirements.txt` plus pytest. On Windows, normal users launch with `Start Ingestion Engine.bat`, which installs from `app/requirements.txt` (pywin32 there is marked `; sys_platform == "win32"`).
 
 ## 3. Repository layout
 
 ```text
-IngestionEngine/
+Jughead-Data-Engine/
 |-- Start Ingestion Engine.bat
 |-- README.md
+|-- AI_CONTEXT.md
+|-- CLAUDE.md
+|-- STATUS.md
+|-- requirements.txt
+|-- .github/
+|   `-- workflows/ci.yml
 |-- app/
 |   |-- main.py
 |   |-- requirements.txt
@@ -58,13 +66,13 @@ IngestionEngine/
 |   |-- logs/
 |   `-- settings.json
 |-- documentation/
+|-- tests/
 `-- developer/
-    |-- tests/
     |-- build/
     `-- tools/
 ```
 
-`app/` is code and bundled resources. `workspace/` is application-managed state, while root `input/` and `output/` are user-facing working folders. Keep those boundaries intact.
+`app/` is code and bundled resources. `workspace/` is application-managed state, while root `input/` and `output/` are user-facing working folders. `tests/` is the pytest suite (moved from `developer/tests/`). Keep those boundaries intact.
 
 ## 4. Entrypoint and path rules
 
@@ -103,7 +111,7 @@ Do not reintroduce module-local `__file__` path calculations except for resource
 7. `engine.excel_writer.write_to_excel()` writes the Search dashboard and Unified Data, then optionally injects VBA and upgrades to XLSM.
 8. `engine.kpi.compute_kpis()` calculates review totals.
 9. `engine.metrics_catalog.get_available_metrics()` exposes totals, averages, breakdowns, dates, and client name to the PowerPoint mapper.
-10. `engine.pptx_fill.fill_template()` or `engine.pptx_live.PPTXLivePreview` fills a mapped deck.
+10. `engine.pptx_fill.fill_template_report()` or `engine.pptx_live.PPTXLivePreview` fills a mapped deck. `fill_template_report()` returns `(path, report)` where the report is an `engine.fill_report.FillReport`; `fill_template()` remains for callers that only need the path.
 
 ## 6. Parsed-data contract
 
@@ -231,6 +239,8 @@ Do not modify the VBA search grammar without updating both `modSearch.bas` and t
 
 Static filling uses `python-pptx` in `engine.pptx_fill`. Live preview and complex chart/table updates use Windows COM in `engine.pptx_live`.
 
+Every fill produces an `engine.fill_report.FillReport` recording what was filled, missing metrics, unmatched `replace_text` placeholders, and failed queries; `engine.fill_report.append_fill_history()` appends one JSON line per fill to `workspace/logs/fill_history.jsonl`. The live preview tracks COM health: after 3 consecutive COM failures it disables itself, fires its `on_disabled` callback once, and Save & Fill falls back to the python-pptx engine; a successful call resets the counter.
+
 Formatting behavior is centralized in `engine.pptx_formats`. Any new display formatting should flow through `_coerce_number()`, `format_with_details()`, or `_format_value()` so the mapper preview and final deck remain consistent.
 
 Partial replacements must preserve surrounding runs and paragraphs. Image replacements must retain the original shape position and size.
@@ -243,12 +253,13 @@ Partial replacements must preserve surrounding runs and paragraphs. Image replac
 - Parser errors use user-facing messages while preserving detailed logs.
 - Logs rotate at 1 MB with three backups.
 - The legacy layout migration copies without deleting source files or overwriting workspace files.
+- The PowerPoint live preview self-disables after 3 consecutive COM failures and Save & Fill falls back to the python-pptx engine; fill outcomes are logged to `workspace/logs/fill_history.jsonl`.
 
 Do not weaken these controls for convenience.
 
 ## 13. Test boundaries
 
-Automated tests cover parsers, dictionary matching, platform application, KPI logic, query resolution, Excel collection/writing, PowerPoint formatting, template bundles, path naming, and smoke pipelines.
+Automated tests cover parsers, dictionary matching, platform application, KPI logic, query resolution, Excel collection/writing, PowerPoint formatting, template bundles, path naming, and smoke pipelines. The July 12, 2026 work added golden-file fill tests (`tests/test_pptx_fill_golden.py`), mapping-store tests (`tests/test_pptx_mapping_store.py`), fill-report tests (`tests/test_fill_report.py`), and live-preview health tests (`tests/test_live_preview_health.py`).
 
 Automated tests do not fully exercise:
 
@@ -272,13 +283,13 @@ Use `documentation/TESTING_AND_RELEASE.md` before release.
 Before editing:
 
 1. Read this file and `CURRENT_ARCHITECTURE.md`.
-2. Run the 171-test suite.
+2. Run the 221-test suite.
 3. Identify whether the change affects Windows COM, Tkinter threading, metric aggregation, or persisted mappings.
 
 After editing:
 
-1. Run `python -m compileall -q app developer/tests`.
-2. Run `python -m pytest developer/tests -q`.
+1. Run `python -m compileall -q app tests`.
+2. Run `python -m pytest tests -q`.
 3. Run the relevant manual checks in `TESTING_AND_RELEASE.md`.
 4. Update `CHANGELOG.md` and any affected documentation.
 5. Do not claim Office integration is verified unless it was run on Windows with Office.

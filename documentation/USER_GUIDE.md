@@ -2,7 +2,7 @@
 
 ## User Guide
 
-**Updated:** July 10, 2026
+**Updated:** July 13, 2026
 
 ## 1. What the application does
 
@@ -28,7 +28,7 @@ The rest of the application can still parse files, review data, write a normal X
 
 ## 3. First launch
 
-1. Copy the complete `IngestionEngine` folder to the computer.
+1. Copy the complete `Jughead-Data-Engine` folder to the computer.
 2. Double-click **`Start Ingestion Engine.bat`**.
 3. The launcher finds Python, checks the version, and installs missing packages from `app/requirements.txt` on the first run.
 4. The main window opens.
@@ -188,6 +188,8 @@ The Query Builder can select a metric, breakdown, campaign/value filter, aggrega
 - **Save Mapping** stores the mapping for later clients and periods.
 - **Save & Fill Template** stores the mapping and creates the current report.
 
+After a fill, the confirmation dialog summarizes what was filled. If anything could not be filled — a missing metric, image, or placeholder — the dialog is titled **Report Generated — With Gaps** and lists what was skipped so it can be corrected.
+
 ## 9. Template sharing
 
 In **Settings > Templates**:
@@ -200,7 +202,7 @@ Imports reject unsafe archive paths, unsupported bundle formats, oversized archi
 ## 10. Folder guide
 
 ```text
-IngestionEngine/
+Jughead-Data-Engine/
 |-- Start Ingestion Engine.bat
 |-- input/                  Optional source-file staging
 |-- output/                 Default generated reports
@@ -211,6 +213,7 @@ IngestionEngine/
 |   |-- logs/               Support logs
 |   `-- settings.json       Created after saving settings
 |-- documentation/
+|-- tests/                  Automated tests; not needed for normal use
 `-- developer/
 ```
 
@@ -227,5 +230,7 @@ To move the application to another computer, copy the entire folder. At minimum,
 | Output cannot be written | Close the existing workbook in Excel and retry. |
 | Interactive search was not enabled | Verify Excel is installed and the Trust Center setting is enabled. The XLSX data remains valid. |
 | Mapper says static mode | PowerPoint COM is unavailable. Static filling may still work. |
+| A "Live Preview Off" notice appears in the mapper | PowerPoint stopped responding, so the preview turned itself off. Keep working; Save & Fill still generates the report. Reopen the mapper to restore the preview. |
+| Report dialog says "With Gaps" | Some mapped items could not be filled. The dialog lists them; check the named metrics, images, or placeholder text and fill again. |
 | A total looks wrong | Review campaign detail, confirm platform column roles, and verify rate metrics are configured as averages. |
 | Unexpected crash | Send `workspace/logs/ingestion_engine.log` to support. |
