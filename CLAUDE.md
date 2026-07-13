@@ -29,6 +29,12 @@ Before changing application code, read `AI_CONTEXT.md` (design rules, business i
    - Run the **Release** workflow (`.github/workflows/release.yml`) on the released ref with the version as input; it creates the tag and the GitHub Release. Remote Claude Code sessions cannot push tags or call the release API directly (the git proxy only allows the designated branch), so the workflow is the supported path.
    - Record the version in STATUS.md's decisions log.
    - If the PR is squash-merged, release the merge commit on main (not the branch head) so the tag stays on the default branch's history.
+   - Trivial bookkeeping/doc-only PRs (e.g. recording a release in STATUS.md) do not get their own release.
+
+## Git notes for future sessions
+
+- **GitHub's own merge commits are not yours to fix.** After a PR merges and the working branch is reset onto main, the branch tip is the PR merge commit that GitHub created server-side (committer `GitHub <noreply@github.com>`, GPG-signed with GitHub's web-flow key — it shows as **Verified** on GitHub). The stop hook's commit-signature check can misread it as an unverified local commit and suggest `git commit --amend --reset-author`. **Do not amend or rebase it** — rewriting a commit that already exists on main forks the branch's history. Just fast-forward push the branch (`git push -u origin <branch>`) so local and remote match, and only ever reset-author commits you actually authored in the session.
+- After a PR for the designated branch merges, restart the branch from main (`git fetch origin main && git checkout -B <branch> origin/main`) before follow-up work; merged PRs are never reused.
 
 ## Code style
 
