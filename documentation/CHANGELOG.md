@@ -41,6 +41,14 @@
   to a pure `build_pivot()` function locked by regression tests.
 - Saved Queries render directly below Quick Fill in the mapper sidebar
   instead of after all breakdown sections.
+- Excel search fixed for re-exports: the writer no longer edits an
+  existing .xlsm in place with openpyxl (which silently dropped the
+  ActiveX search box and corrupted the sheet/VBA wiring — the search broke
+  on every re-export of the same period). Every export now harvests the
+  previous rows, rebuilds the workbook from scratch, and re-injects the
+  VBA search engine; merge semantics (same-key replacement, distinct
+  periods preserved) are unchanged. A stale macro workbook is never left
+  behind holding old data.
 - KPI accuracy against vendor dashboards (traced on a real order where
   impressions matched the vendor to the digit):
   - Completion Rate now uses Video Starts as the denominator when the
@@ -51,7 +59,7 @@
     review totals are now labeled "Combined Reach (not deduplicated)" and
     "Avg Campaign Frequency", each with a data flag pointing to the vendor
     dashboard for order-level numbers. Per-campaign values are unchanged.
-- 248 automated tests pass.
+- 249 automated tests pass.
 
 ## July 13, 2026 - MappingModel extraction (mapper roadmap Phase 3)
 

@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "248 passed",
+  "verified_test_result": "249 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -151,7 +151,7 @@
     },
     {
       "path": "app/engine/excel_search_dashboard.py",
-      "lines": 332,
+      "lines": 334,
       "public_symbols": [
         "NAVY",
         "BLUE",
@@ -171,7 +171,7 @@
         "build_config_rows",
         "build_search_dashboard"
       ],
-      "sha256": "f29e798dc9d2732ec65e7f1cd8a6b74125e9a3dea91eb13e55e2328d9dfbe338"
+      "sha256": "900af07675d566674a986d8eb1029aa0b9f75d3b2dbf5367c56350a9e9e5e320"
     },
     {
       "path": "app/engine/excel_utils.py",
@@ -201,7 +201,7 @@
     },
     {
       "path": "app/engine/excel_writer.py",
-      "lines": 172,
+      "lines": 175,
       "public_symbols": [
         "NAVY",
         "LIGHT_BLUE",
@@ -226,10 +226,9 @@
         "CR_HEADER_FILL",
         "CR_TITLE_FONT",
         "CR_DATE_FONT",
-        "MANAGED_SHEETS",
         "write_to_excel"
       ],
-      "sha256": "9edf938928529026f349668d6eeca4f4931709e0b686333f97b365317a98f936"
+      "sha256": "cb8821cf30d2890e8c5179e95da37e271665decb85ffe1f8a3b85707f048eedb"
     },
     {
       "path": "app/engine/fill_report.py",
