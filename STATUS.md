@@ -29,7 +29,8 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - Verified review data flags are computed (engine.kpi zero-value + rate-mis-alias heuristics), not hardcoded.
   - Performance: KPI compute moved into the background export pass; review detail rows build lazily on expand; client-wizard search debounced (250 ms); query-builder data scan cached per mapper session.
   - Round 2 (Windows re-test feedback): Saved Queries moved directly below Quick Fill; **query pivot correctness fix** — the pivot no longer pools rows across breakdown types (each type re-slices the same delivery, so each type's "Other" bucket summed into a giant bogus top row in shipped tables). Empty breakdown selection now yields the documented campaign-totals table; colliding values across selected types render as disambiguated rows ("Other (zone)"). Pivot extracted to pure `build_pivot()` with regression tests.
-  - 244 tests pass (8 new this phase).
+  - Round 3 (KPI-vs-vendor audit): impressions matched the vendor exactly; three derived metrics explained and addressed. Completion Rate now divides by Video Starts when present (vendor VCR; was impressions-only → 91.98 vs 98.36). Reach/Frequency totals cannot be deduplicated from campaign aggregates (vendor 325,644 vs summed 1,039,763) — relabeled "Combined Reach (not deduplicated)" / "Avg Campaign Frequency" with explanatory data flags; per-campaign values unchanged. Completions ±1 vs vendor traced to best-source picking a breakdown that sums 1 higher than the vendor's own summary (their rounding) — accepted.
+  - 248 tests pass (12 new this phase).
 
 ## Next up
 
@@ -63,6 +64,8 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - `PPTXWizard.image_paths` is an unused leftover attribute.
 - Query-builder queries carry `campaigns`/`sources`/`values`/`top_n` keys, but `engine.query_resolver.resolve_query()` only honors `metric`/`breakdown`/`filter`/`agg` — a re-resolved builder query (e.g. review auto-fill in a later session) can differ from the pivot total shown at apply time. In-session fills use the cached value and are correct. Needs a resolver extension or query translation.
 - Opening the mapper computes `get_available_metrics()` on the Tk thread — noticeable but tolerable on large imports; move behind `run_in_background` if it becomes a complaint.
+- The mapper catalog still exposes `Total Reach` / `Avg Frequency` keys carrying the non-deduplicated values (renaming them would break saved template mappings). Decide whether deck-side labels should match the review screen's non-dedup labels, or whether those catalog entries should be dropped in favor of manual vendor numbers.
+- If any vendor export contains an order-level (deduplicated) reach/frequency summary row, the KPI engine could prefer it over the campaign sum — needs a sample export to confirm the shape.
 
 ## How to run
 

@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "244 passed",
+  "verified_test_result": "248 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -243,13 +243,13 @@
     },
     {
       "path": "app/engine/kpi.py",
-      "lines": 121,
+      "lines": 155,
       "public_symbols": [
         "KPI_METRICS",
         "KPI_ALIASES",
         "compute_kpis"
       ],
-      "sha256": "c746b25a2e135d85f3786cc01503a8918acf9d649df7918ecc6e14dbc55562fd"
+      "sha256": "1e185a14eb29f1b864ae70997efcdf7dec41557b7b93f0c979430b374119c5fb"
     },
     {
       "path": "app/engine/metrics_catalog.py",

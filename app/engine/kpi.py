@@ -90,25 +90,59 @@ def compute_kpis(client_data):
                     camp_avg[camp_avg["metric"] == metric]["value"].mean(), 2)
 
         _derive_completion_rate(kpi_totals, campaign_details)
+        _relabel_non_dedup_totals(kpi_totals, flags)
 
     return kpi_totals, campaign_details, flags
 
 
+# Cross-campaign Reach/Frequency need household-level deduplication only
+# the vendor can do (campaign aggregates carry no overlap information, so a
+# 3x gap against vendor dashboards is possible). Approved 2026-07-13: keep
+# the values but label them honestly and flag the caveat. Per-campaign
+# values in campaign_details are vendor-computed and stay as-is.
+_NON_DEDUP_RELABELS = {
+    "Reach": "Combined Reach (not deduplicated)",
+    "Frequency": "Avg Campaign Frequency",
+}
+_NON_DEDUP_FLAGS = {
+    "Reach": ("Reach total is campaign reach summed WITHOUT household "
+              "deduplication — the vendor's true order reach will be lower. "
+              "Take order-level reach from the vendor dashboard."),
+    "Frequency": ("Frequency total is the average of per-campaign "
+                  "frequencies — the vendor's order frequency (impressions ÷ "
+                  "deduplicated reach) will be higher. Take order-level "
+                  "frequency from the vendor dashboard."),
+}
+
+
+def _relabel_non_dedup_totals(kpi_totals, flags):
+    for metric, label in _NON_DEDUP_RELABELS.items():
+        if metric in kpi_totals:
+            kpi_totals[label] = kpi_totals.pop(metric)
+            flags.append(_NON_DEDUP_FLAGS[metric])
+
+
 _RATE_NAMES = ("Completion Rate", "Completion Percent")
 _NUMERATORS = ("Completions", "Contributions", "100% Completions")
+# Vendor dashboards compute VCR against video starts; approved rule
+# (2026-07-13): use starts when the export carries them, impressions
+# otherwise. Completions/impressions read ~6 points lower than the vendor
+# because not every impression starts the video.
+_DENOMINATORS = ("Video Starts", "Impressions")
 
 
 def _derive_completion_rate(kpi_totals, campaign_details):
-    """Approved rule: rate = 100 * Σcompletions / Σimpressions. Overrides
+    """Approved rule: rate = 100 * Σcompletions / Σvideo starts, falling
+    back to Σimpressions when the export has no starts metric. Overrides
     the naive average (which overweights small campaigns) for totals and
     per-campaign details whenever the inputs exist."""
     def rate_from(d):
-        imps = d.get("Impressions")
-        if not imps:
+        denom = next((d[n] for n in _DENOMINATORS if d.get(n)), None)
+        if not denom:
             return None
         for n in _NUMERATORS:
             if d.get(n) is not None:
-                return round(100.0 * d[n] / imps, 2)
+                return round(100.0 * d[n] / denom, 2)
         return None
     total = rate_from(kpi_totals)
     if total is not None:

@@ -58,7 +58,7 @@ python -m pytest tests -q
 python -m compileall -q app tests
 ```
 
-Current verified baseline: **244 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
+Current verified baseline: **248 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
 
 For Windows releases, also complete the Office acceptance checks in `documentation/TESTING_AND_RELEASE.md`. Linux/macOS test success does not validate Excel VBA injection or PowerPoint COM behavior.
 

@@ -41,7 +41,17 @@
   to a pure `build_pivot()` function locked by regression tests.
 - Saved Queries render directly below Quick Fill in the mapper sidebar
   instead of after all breakdown sections.
-- 244 automated tests pass.
+- KPI accuracy against vendor dashboards (traced on a real order where
+  impressions matched the vendor to the digit):
+  - Completion Rate now uses Video Starts as the denominator when the
+    export carries a starts metric (vendor VCR definition), falling back
+    to impressions otherwise. New "Video Starts"/"Starts" aliases.
+  - Cross-campaign Reach/Frequency cannot be deduplicated from campaign
+    aggregates (vendor reach was 3.2x lower than the campaign sum). The
+    review totals are now labeled "Combined Reach (not deduplicated)" and
+    "Avg Campaign Frequency", each with a data flag pointing to the vendor
+    dashboard for order-level numbers. Per-campaign values are unchanged.
+- 248 automated tests pass.
 
 ## July 13, 2026 - MappingModel extraction (mapper roadmap Phase 3)
 
