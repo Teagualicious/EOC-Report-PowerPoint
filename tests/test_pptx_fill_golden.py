@@ -428,3 +428,158 @@ def test_text_case_matching_follows_existing_text(tmp_path):
 
     assert _shape_text(out, 0, idx_upper) == "JUNE RECAP"
     assert _shape_text(out, 0, idx_title) == "June Recap"
+
+
+# ── Image path fallbacks and failure isolation ────────────────────────────────
+
+def test_image_relative_path_resolves_from_workspace_dir(tmp_path, monkeypatch):
+    """Mappings created before the workspace restructure store paths like
+    'templates/images/logo.png' relative to workspace/, not the app root."""
+    pytest.importorskip("PIL")
+    import engine.pptx_fill as pf
+    monkeypatch.setattr(pf, "APP_ROOT", str(tmp_path / "nowhere"))
+    monkeypatch.setattr(pf, "WORKSPACE_DIR", str(tmp_path / "ws"))
+    (tmp_path / "ws" / "templates" / "images").mkdir(parents=True)
+    _tiny_png(tmp_path / "ws" / "templates" / "images" / "logo.png")
+    tpl = _new_deck(tmp_path)
+    idx = _add_textbox(tpl, 0, [("LOGO", False)])
+    out = str(tmp_path / "out.pptx")
+
+    fill_template(tpl, out,
+                  {"slides": {"1": {"shape_mappings": {str(idx): {
+                      "image_path": os.path.join("templates", "images",
+                                                 "logo.png")}}}}},
+                  {})
+
+    prs = Presentation(out)
+    assert any(s.shape_type == 13 for s in prs.slides[0].shapes)
+
+
+def test_image_path_abs_fallback_when_relative_paths_fail(tmp_path, monkeypatch):
+    pytest.importorskip("PIL")
+    import engine.pptx_fill as pf
+    monkeypatch.setattr(pf, "APP_ROOT", str(tmp_path / "nowhere"))
+    monkeypatch.setattr(pf, "WORKSPACE_DIR", str(tmp_path / "nowhere-either"))
+    png = _tiny_png(tmp_path / "elsewhere.png")
+    tpl = _new_deck(tmp_path)
+    idx = _add_textbox(tpl, 0, [("LOGO", False)])
+    out = str(tmp_path / "out.pptx")
+
+    fill_template(tpl, out,
+                  {"slides": {"1": {"shape_mappings": {str(idx): {
+                      "image_path": "gone/logo.png",
+                      "image_path_abs": png}}}}},
+                  {})
+
+    prs = Presentation(out)
+    assert any(s.shape_type == 13 for s in prs.slides[0].shapes)
+
+
+def test_corrupt_image_error_is_isolated_and_reported(tmp_path):
+    """An unreadable image file must not abort the fill: the error lands in
+    the report and every other shape still fills."""
+    from engine.pptx_fill import fill_template_report
+
+    tpl = _new_deck(tmp_path)
+    idx_img = _add_textbox(tpl, 0, [("LOGO", False)])
+    idx_txt = _add_textbox(tpl, 0, [("PLAIN", False)], top=3)
+    fake_png = tmp_path / "corrupt.png"
+    fake_png.write_text("not an image")
+    out = str(tmp_path / "out.pptx")
+    mapping = {"slides": {"1": {"shape_mappings": {
+        str(idx_img): {"image_path": str(fake_png)},
+        str(idx_txt): {"assignments": [{"metric": "M", "format": "text"}]},
+    }}}}
+
+    _path, report = fill_template_report(tpl, out, mapping, {"M": "512"})
+
+    assert len(report.errors) == 1
+    assert report.ok is False
+    assert _shape_text(out, 0, idx_img) == "LOGO"  # original shape kept
+    assert _shape_text(out, 0, idx_txt) == "512"
+
+
+def test_image_assignment_takes_precedence_over_text_assignments(tmp_path):
+    """A shape mapped to both an image and text assignments becomes the
+    image; the text assignments on that shape are ignored."""
+    pytest.importorskip("PIL")
+    from engine.pptx_fill import fill_template_report
+
+    tpl = _new_deck(tmp_path)
+    idx = _add_textbox(tpl, 0, [("LOGO", False)])
+    png = _tiny_png(tmp_path / "logo.png")
+    out = str(tmp_path / "out.pptx")
+    mapping = {"slides": {"1": {"shape_mappings": {str(idx): {
+        "image_path": png,
+        "assignments": [{"metric": "M", "format": "text"}]}}}}}
+
+    _path, report = fill_template_report(tpl, out, mapping, {"M": "IGNORED"})
+
+    assert report.images_filled == 1
+    assert report.filled == 0
+    prs = Presentation(out)
+    assert all("IGNORED" not in (s.text_frame.text if s.has_text_frame else "")
+               for s in prs.slides[0].shapes)
+
+
+# ── Report-visible fill edge cases ────────────────────────────────────────────
+
+def test_format_details_date_style_formats_range(tmp_path):
+    """A date format_details wins over numeric coercion and restyles both
+    ends of an ISO range."""
+    tpl = _new_deck(tmp_path)
+    idx = _add_textbox(tpl, 0, [("REPORT PERIOD", False)])
+    out = str(tmp_path / "out.pptx")
+
+    fill_template(tpl, out,
+                  _mapping(1, idx, metric="__date_range__", format="date",
+                           format_details={"format": "date",
+                                           "date_style": "us_slash"}),
+                  {"__date_range__": "2026-06-01 - 2026-06-30"})
+
+    assert _shape_text(out, 0, idx) == "06/01/2026 – 06/30/2026"
+
+
+def test_mixed_matched_and_unmatched_placeholders_on_one_shape(tmp_path):
+    """One assignment lands, its sibling's placeholder is gone: the fill
+    applies what it can and the report names only the unmatched one."""
+    from engine.pptx_fill import fill_template_report
+
+    tpl = _new_deck(tmp_path)
+    idx = _add_textbox(tpl, 0, [("Imps: [I], Clicks: [C]", False)])
+    out = str(tmp_path / "out.pptx")
+    mapping = {"slides": {"1": {"shape_mappings": {str(idx): {"assignments": [
+        {"metric": "I", "format": "text", "replace_text": "[I]"},
+        {"metric": "X", "format": "text", "replace_text": "[GONE]"},
+    ]}}}}}
+
+    _path, report = fill_template_report(tpl, out, mapping,
+                                         {"I": "100", "X": "7"})
+
+    assert report.filled == 1
+    assert report.unmatched_placeholders == [
+        {"metric": "X", "placeholder": "[GONE]"}]
+    assert _shape_text(out, 0, idx) == "Imps: 100, Clicks: [C]"
+
+
+def test_text_assignment_on_shape_without_text_frame_is_silent_noop(tmp_path):
+    """Current behavior: a text assignment mapped onto a picture shape does
+    nothing and is not reported. Locked here so a future change to surface
+    it is deliberate."""
+    pytest.importorskip("PIL")
+    from engine.pptx_fill import fill_template_report
+
+    tpl = _new_deck(tmp_path)
+    png = _tiny_png(tmp_path / "pic.png")
+    prs = Presentation(tpl)
+    prs.slides[0].shapes.add_picture(png, Inches(1), Inches(1))
+    pic_idx = len(prs.slides[0].shapes) - 1
+    prs.save(tpl)
+    out = str(tmp_path / "out.pptx")
+
+    _path, report = fill_template_report(
+        tpl, out, _mapping(1, pic_idx, metric="M", format="text"),
+        {"M": "value"})  # must not raise
+
+    assert report.filled == 0
+    assert report.ok is True
