@@ -129,6 +129,35 @@ class TestWriterRoundTrip:
         ws = load_workbook(path)["Unified Data"]
         assert ws.max_row == 3  # header + 2 unique rows, not doubled
 
+    def test_reexport_over_xlsm_rebuilds_fresh_and_removes_stale(self, tmp_path):
+        """Regression: the old re-export path edited the existing .xlsm in
+        place with openpyxl, which cannot round-trip macro workbooks — the
+        ActiveX search box was dropped and the VBA wiring corrupted, so the
+        search broke on every re-export of the same period. The writer must
+        instead harvest the rows, rebuild the workbook from scratch (full
+        Search sheet + defined names), and never leave the stale macro
+        workbook behind holding old data."""
+        import os
+        from engine.excel_writer import write_to_excel
+
+        out = str(tmp_path / "r.xlsx")
+        first_path, _ = write_to_excel(self._client_data(), out)
+        # Simulate the Windows COM upgrade of the first export to .xlsm
+        xlsm = str(tmp_path / "r.xlsm")
+        os.rename(first_path, xlsm)
+
+        path, _vba_err = write_to_excel(self._client_data(), out)
+
+        assert path.endswith(".xlsx")     # injection unavailable off-Windows
+        assert not os.path.exists(xlsm)   # stale macro workbook removed
+        wb = load_workbook(path)
+        assert wb.sheetnames[0] == "Search"   # fully rebuilt, not stripped
+        for nm in ("SearchCell", "DateStart", "DateEnd", "ResultsAnchor"):
+            assert nm in wb.defined_names
+        assert {"_SearchIndex", "_Config"} <= set(wb.sheetnames)
+        # Rows harvested from the .xlsm and merged — replaced, not doubled
+        assert wb["Unified Data"].max_row == 3
+
 
 def test_copy_chip_present(df=None):
     import pandas as pd

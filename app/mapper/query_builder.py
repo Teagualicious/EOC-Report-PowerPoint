@@ -12,6 +12,84 @@ from engine.query_resolver import get_available_breakdowns
 logger = logging.getLogger(__name__)
 
 
+def _auto_query_name(query, existing):
+    """Readable sidebar name for an unnamed applied query, unique among
+    ``existing`` names."""
+    base = f"Query: {query.get('metric', 'Value')} ({query.get('agg', 'sum')})"
+    name = base
+    counter = 2
+    while name in existing:
+        name = f"{base} {counter}"
+        counter += 1
+    return name
+
+
+def build_pivot(full_df, metric, agg, topn, sel_camps, sel_sources, sel_vals):
+    """Pure pivot computation behind the preview and Table/Chart outputs.
+
+    Returns ``(pivot_df_or_None, note)``. Data-correctness rules — these
+    tables ship in client reports:
+
+    - With NO breakdown type selected, only campaign-total rows are used.
+      Pooling every breakdown type counts the same delivery once per type,
+      which surfaced as a giant bogus "Other" top row.
+    - A level value that exists in more than one selected breakdown type
+      ("Other" appears in zip AND dow AND network) stays as separate
+      disambiguated rows — e.g. "Other (zip)" — instead of being silently
+      summed across types.
+    """
+    df = full_df[full_df["metric"] == metric]
+    if sel_camps:
+        df = df[df["campaign"].isin(sel_camps)]
+    if sel_sources:
+        df = df[df["source"].isin(sel_sources)]
+    else:
+        # "Clean campaign-totals preview" — the documented default for an
+        # empty Breakdown Type selection.
+        df = df[df["source"] == "campaign"]
+    if sel_vals:
+        df = df[(df["level_value"].isin(sel_vals)) | (df["level_value"] == "")]
+
+    if df.empty:
+        return None, "No data matches filters"
+
+    agg_func = {"sum": "sum", "avg": "mean", "max": "max", "min": "min",
+                "count": "count"}.get(agg, "sum")
+
+    note = ""
+    has_levels = bool(df["level_value"].any())
+    if has_levels:
+        level_df = df[df["level_value"] != ""].copy()
+        source_counts = level_df.groupby("level_value")["source"].nunique()
+        ambiguous = set(source_counts[source_counts > 1].index)
+        if ambiguous:
+            mask = level_df["level_value"].isin(ambiguous)
+            level_df.loc[mask, "level_value"] = (
+                level_df.loc[mask, "level_value"] + " ("
+                + level_df.loc[mask, "source"] + ")")
+        pivot = level_df.pivot_table(
+            index="level_value", columns="campaign",
+            values="value", aggfunc=agg_func, fill_value=0)
+        pivot["Total"] = pivot.sum(axis=1)
+        pivot = pivot[pivot["Total"] != 0]   # all-zero rows are noise
+        pivot = pivot.sort_values("Total", ascending=False)
+        if pivot.empty:
+            has_levels = False
+            note = ("  (no " + metric + " at the selected level - "
+                    "showing campaign totals)")
+    if not has_levels:
+        pivot = df.groupby("campaign")["value"].agg(agg_func).reset_index()
+        pivot.columns = ["Campaign", metric]
+        pivot = pivot.sort_values(metric, ascending=False).set_index("Campaign")
+
+    if topn != "all":
+        try:
+            pivot = pivot.head(int(topn))
+        except ValueError:
+            logger.debug("Invalid Top N value: %r", topn)
+    return pivot, note
+
+
 def show_query_builder(wizard):
     """Open the advanced query builder; writes the chosen query/metric back
     onto the wizard (selected_metric, _pending_query, _pending_table_data,
@@ -24,39 +102,51 @@ def show_query_builder(wizard):
     win.configure(bg=t["bg"]); win.transient(wizard.window); win.grab_set()
     win.lift(); win.focus_force()
 
-    # Collect raw data into DataFrame for filtering
-    raw_rows = []
-    all_campaigns = set()
-    for data in wizard.export_result["client_data"]:
-        for mdata in data.get("campaign_metrics", {}).values():
-            mn = mdata.get("universal_name", "")
-            mv = mdata.get("value", 0)
-            camp = mdata.get("campaign_name", "")
-            if mn and isinstance(mv, (int, float)):
-                raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
-                                 "source": "campaign", "level_value": ""})
-                all_campaigns.add(camp)
-        for ld in data.get("level_data", []):
-            mn = ld.get("metric_name", "")
-            mv = ld.get("metric_value", 0)
-            ml = ld.get("metric_level", "")
-            camp = ld.get("_campaign", "")
-            prefix = ml.split(":")[0] if ":" in ml else ml
-            lv = ml.split(":", 1)[1] if ":" in ml else ""
-            if mn and isinstance(mv, (int, float)):
-                raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
-                                 "source": prefix, "level_value": lv})
-                all_campaigns.add(camp)
+    # Collect raw data into a DataFrame for filtering. The scan is
+    # O(all level rows), so it is cached per mapper session — client_data
+    # never changes for an open wizard, and rebuilding it on every open of
+    # the query builder made large imports feel frozen.
+    cache = getattr(wizard, "_query_builder_cache", None)
+    if cache is None:
+        raw_rows = []
+        all_campaigns = set()
+        for data in wizard.export_result["client_data"]:
+            for mdata in data.get("campaign_metrics", {}).values():
+                mn = mdata.get("universal_name", "")
+                mv = mdata.get("value", 0)
+                camp = mdata.get("campaign_name", "")
+                if mn and isinstance(mv, (int, float)):
+                    raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
+                                     "source": "campaign", "level_value": ""})
+                    all_campaigns.add(camp)
+            for ld in data.get("level_data", []):
+                mn = ld.get("metric_name", "")
+                mv = ld.get("metric_value", 0)
+                ml = ld.get("metric_level", "")
+                camp = ld.get("_campaign", "")
+                prefix = ml.split(":")[0] if ":" in ml else ml
+                lv = ml.split(":", 1)[1] if ":" in ml else ""
+                if mn and isinstance(mv, (int, float)):
+                    raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
+                                     "source": prefix, "level_value": lv})
+                    all_campaigns.add(camp)
+        cache = {
+            "df": pd.DataFrame(raw_rows) if raw_rows else None,
+            "campaigns": sorted(all_campaigns),
+            "breakdowns": get_available_breakdowns(
+                wizard.export_result["client_data"]),
+        }
+        wizard._query_builder_cache = cache
 
-    if not raw_rows:
+    if cache["df"] is None:
         messagebox.showwarning("No Data", "No metric data available.")
         win.destroy(); return
 
-    full_df = pd.DataFrame(raw_rows)
+    full_df = cache["df"]
     metrics_list = sorted(full_df["metric"].unique())
     sources_list = sorted(full_df["source"].unique())
-    campaigns_list = sorted(all_campaigns)
-    breakdowns = get_available_breakdowns(wizard.export_result["client_data"])
+    campaigns_list = cache["campaigns"]
+    breakdowns = cache["breakdowns"]
 
     # ── Top controls row ──
     ctrl = tk.Frame(win, bg=t["bg"])
@@ -176,44 +266,13 @@ def show_query_builder(wizard):
         sel_sources = [bd_listbox.get(i) for i in bd_listbox.curselection()]
         sel_vals = [val_listbox.get(i) for i in val_listbox.curselection()]
 
-        df = full_df.copy()
-        df = df[df["metric"] == metric]
-        if sel_camps: df = df[df["campaign"].isin(sel_camps)]
-        if sel_sources: df = df[df["source"].isin(sel_sources)]
-        if sel_vals:
-            df = df[(df["level_value"].isin(sel_vals)) | (df["level_value"] == "")]
-
-        if df.empty:
-            result_label.config(text="No data matches filters")
+        pivot, note = build_pivot(full_df, metric, agg, topn,
+                                  sel_camps, sel_sources, sel_vals)
+        if pivot is None:
+            result_label.config(text=note or "No data matches filters")
             tree.delete(*tree.get_children())
             pivot_result["df"] = None
             return
-
-        agg_func = {"sum": "sum", "avg": "mean", "max": "max", "min": "min", "count": "count"}.get(agg, "sum")
-
-        note = ""
-        has_levels = df["level_value"].any()
-        if has_levels:
-            pivot = df[df["level_value"] != ""].pivot_table(
-                index="level_value", columns="campaign",
-                values="value", aggfunc=agg_func, fill_value=0)
-            pivot["Total"] = pivot.sum(axis=1)
-            pivot = pivot[pivot["Total"] != 0]   # all-zero rows are noise
-            pivot = pivot.sort_values("Total", ascending=False)
-            if pivot.empty:
-                has_levels = False
-                note = ("  (no " + metric + " at the selected level - "
-                        "showing campaign totals)")
-        if not has_levels:
-            pivot = df.groupby("campaign")["value"].agg(agg_func).reset_index()
-            pivot.columns = ["Campaign", metric]
-            pivot = pivot.sort_values(metric, ascending=False).set_index("Campaign")
-
-        if topn != "all":
-            try:
-                pivot = pivot.head(int(topn))
-            except ValueError:
-                logger.debug("Invalid Top N value: %r", topn)
 
         total = pivot["Total"].sum() if "Total" in pivot.columns else pivot.iloc[:, -1].sum()
         vd = f"{total:,.0f}" if isinstance(total, (int, float)) else str(total)
@@ -267,11 +326,13 @@ def show_query_builder(wizard):
             refresh_pivot()
             q = pivot_result.get("query", {})
         if not q: return
-        qname = qname_var.get().strip()
-        if qname:
-            key = qname                      # human name -> sidebar metric
-        else:
-            key = f"__query_{q.get('metric', '')}_{hash(str(q))}__"
+        # Every applied query becomes a visible sidebar metric: the typed
+        # name if given, otherwise a readable auto-name. Apply used to arm
+        # an invisible selection when the name was blank — nothing appeared
+        # in Metrics & Values and users assumed the button did nothing.
+        if not hasattr(wizard, "named_queries"):
+            wizard.named_queries = {}
+        key = qname_var.get().strip() or _auto_query_name(q, wizard.named_queries)
         # Resolve value
         piv = pivot_result.get("df")
         if piv is not None:
@@ -319,19 +380,18 @@ def show_query_builder(wizard):
             q["output"] = "chart"
         else:
             q["output"] = "value"
-        if qname:
-            if not hasattr(wizard, "named_queries"):
-                wizard.named_queries = {}
-            wizard.named_queries[qname] = {"query": dict(q)}
+        wizard.named_queries[key] = {"query": dict(q)}
         wizard.selected_metric = key
         wizard._pending_query = q
         wizard._pending_image = None
-        # Named queries appear in the sidebar metric list for reuse
+        # The applied query appears in the sidebar (Saved Queries) armed for
+        # assignment — click a shape to place it, or re-click it later.
         try:
-            if qname and hasattr(wizard, "_refresh_metrics"):
+            if hasattr(wizard, "_refresh_metrics"):
                 wizard._refresh_metrics()
         except Exception:
-            pass
+            logger.warning("Sidebar refresh after query apply failed",
+                           exc_info=True)
         win.destroy()
 
     tk.Button(bottom, text="Apply as Value", font=("Calibri", 10),

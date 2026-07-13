@@ -238,7 +238,7 @@ UI code must not call Tk APIs from the worker function.
 
 ## 17. Automated validation
 
-The current suite contains 236 passing tests in `tests/` at the repo root. It covers pure data/business behavior, document generation that can be tested without Office, Windows DPI sizing helpers, PowerPoint template-preview fallbacks, fill-outcome reporting, and live-preview health tracking.
+The current suite contains 249 passing tests in `tests/` at the repo root. It covers pure data/business behavior, document generation that can be tested without Office, Windows DPI sizing helpers, PowerPoint template-preview fallbacks, fill-outcome reporting, and live-preview health tracking.
 
 Run from the repo root:
 

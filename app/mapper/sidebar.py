@@ -21,9 +21,20 @@ class SidebarMixin:
         search = self.metric_search_var.get().lower() if hasattr(self, 'metric_search_var') else ""
 
         options = build_simple_options(self.structured_metrics)
-        # Saved named queries (R3) — rendered like any other metric row
-        for _qn in sorted(getattr(self, 'named_queries', {})):
-            options.append({'category': 'queries', 'label': _qn, 'key': _qn})
+        # Saved/applied queries — rendered like any other metric row. The
+        # stored query dict rides along so re-clicking the entry re-arms it
+        # for assignment (and re-fills recompute it instead of going stale).
+        # They slot in directly below the Quick Fill block so fresh applies
+        # are visible without scrolling past every breakdown section.
+        query_opts = [{'category': 'queries', 'label': _qn, 'key': _qn,
+                       'query': self.named_queries[_qn].get('query')}
+                      for _qn in sorted(getattr(self, 'named_queries', {}))]
+        if query_opts:
+            insert_at = 0
+            for _i, _opt in enumerate(options):
+                if _opt['category'] == 'special':
+                    insert_at = _i + 1
+            options[insert_at:insert_at] = query_opts
 
         current_category = ""
         category_labels = {"special": "Quick Fill", "total": "KPI Totals",
@@ -166,6 +177,12 @@ class SidebarMixin:
         for child in btn.winfo_children():
             child.bind("<Button-1>", select)
             child.bind("<Button-3>", right_click)
+        # Keep the armed selection visibly highlighted across sidebar
+        # rebuilds (e.g. right after an Advanced Query "Apply as ...")
+        if key == getattr(self, "selected_metric", None):
+            btn.configure(bg=t["highlight"])
+            for child in btn.winfo_children():
+                child.configure(bg=t["highlight"])
         self.metric_buttons[key] = btn
 
     # Date-flavored quick fills get the compact date-only format popup

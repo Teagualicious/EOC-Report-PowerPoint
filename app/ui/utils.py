@@ -12,27 +12,50 @@ from tkinter import ttk
 _BASE_TK_SCALING = 96 / 72  # Tk's scaling value at 100% Windows DPI.
 
 
+def _scroll_nearest(widget, delta):
+    """Scroll the nearest scrollable ancestor of ``widget`` by ``delta``."""
+    target = widget
+    while target is not None:
+        if isinstance(target, (tk.Canvas, ttk.Treeview, tk.Listbox, tk.Text)):
+            try:
+                units = -1 if delta > 0 else 1
+                if abs(delta) >= 120:
+                    units = -1 * (delta // 120)
+                target.yview_scroll(units, "units")
+            except tk.TclError:
+                pass
+            return
+        target = getattr(target, "master", None)
+
+
 def enable_mousewheel(window):
-    """Route mouse-wheel events to the scrollable widget under the cursor."""
+    """Route mouse-wheel events to the scrollable widget under the cursor.
+
+    Also neutralizes the ttk.Combobox class binding that spins a closed
+    combobox's VALUE on wheel — hovering a role/platform dropdown while
+    scrolling a pane silently corrupted selections. The wheel still scrolls
+    the surrounding pane (and an open dropdown list scrolls normally); it
+    just never changes a closed combobox's selection.
+    """
     def _on_mousewheel(event):
-        target = event.widget
-        while target is not None:
-            if isinstance(target, (tk.Canvas, ttk.Treeview, tk.Listbox, tk.Text)):
-                try:
-                    delta = -1 if event.delta > 0 else 1
-                    if abs(event.delta) >= 120:
-                        delta = -1 * (event.delta // 120)
-                    target.yview_scroll(delta, "units")
-                except tk.TclError:
-                    pass
-                return
-            target = getattr(target, "master", None)
+        _scroll_nearest(event.widget, event.delta)
 
     window.bind_all("<MouseWheel>", _on_mousewheel)
-    window.bind_all("<Button-4>",
-                    lambda e: _on_mousewheel(type("E", (), {"widget": e.widget, "delta": 120})()))
-    window.bind_all("<Button-5>",
-                    lambda e: _on_mousewheel(type("E", (), {"widget": e.widget, "delta": -120})()))
+    window.bind_all("<Button-4>", lambda e: _scroll_nearest(e.widget, 120))
+    window.bind_all("<Button-5>", lambda e: _scroll_nearest(e.widget, -120))
+
+    # Class bindings override ttk's default combobox wheel behavior globally.
+    # "break" stops both the value spin and the bind_all handler above, so
+    # the guard forwards the scroll to the pane itself.
+    def _combo_guard(event):
+        _scroll_nearest(event.widget, getattr(event, "delta", 0) or 0)
+        return "break"
+
+    window.bind_class("TCombobox", "<MouseWheel>", _combo_guard)
+    window.bind_class("TCombobox", "<Button-4>",
+                      lambda e: (_scroll_nearest(e.widget, 120), "break")[1])
+    window.bind_class("TCombobox", "<Button-5>",
+                      lambda e: (_scroll_nearest(e.widget, -120), "break")[1])
 
 
 def _dpi_scale_factor(win):

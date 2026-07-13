@@ -69,12 +69,14 @@ def test_html_parser_self_classifies(tmp_path):
 
 def test_ratio_metrics_average_instead_of_sum():
     """Regression: 63 daily Frequency rows of ~2.5 summed to a garbage
-    159.74 'Total Frequency'. Ratio metrics now average."""
+    159.74 'Total Frequency'. Ratio metrics now average. (The review total
+    is keyed 'Avg Campaign Frequency' since the 2026-07-13 non-dedup
+    relabeling; the averaging rule under test is unchanged.)"""
     rows = [{"metric_name": "Frequency", "metric_value": 2.5,
              "metric_level": f"date:D{i}", "_campaign": "C1"} for i in range(63)]
     data = [{"campaign_metrics": {}, "level_data": rows}]
     kpi_totals, details, _ = compute_kpis(data)
-    assert kpi_totals["Frequency"] == 2.5
+    assert kpi_totals["Avg Campaign Frequency"] == 2.5
     assert details["C1"]["Frequency"] == 2.5
     metrics, _ = get_available_metrics(data, "T", "", "")
     assert metrics["Avg Frequency"] == 2.5

@@ -1,5 +1,66 @@
 # Changelog
 
+## July 13, 2026 - Windows debugging batch: wheel/layout fixes, query UX, UI performance
+
+- The mouse wheel no longer changes a closed dropdown's value anywhere in
+  the app. Hovering a role/platform combobox while scrolling a pane was
+  silently corrupting selections (Platform Setup roles shifted one entry);
+  the wheel now always scrolls the surrounding pane instead. Open dropdown
+  lists still scroll normally.
+- Platform Setup rows now share one grid per sheet, so the Role and Sample
+  columns align exactly instead of staggering when sample text is long.
+- The client-assignment window no longer maximizes over the Windows
+  taskbar; it is sized to the usable work area so the Next/Back bar is
+  always visible on any screen size. (Resolves the roadmap's
+  zoomed-vs-fit_window question: fit_window wins.)
+- Advanced Query Builder: every "Apply as ..." now creates a visible,
+  assignable metric in the sidebar's Saved Queries section — named with the
+  typed metric name, or a readable auto-name ("Query: Impressions (sum)")
+  when the name is blank. Previously an unnamed apply armed an invisible
+  selection and appeared to do nothing. Saved entries also re-arm their
+  stored query when clicked again, and the applied metric shows highlighted.
+- UI performance with large imports:
+  - KPI totals/flags are computed in the background export pass instead of
+    on the Tk thread when the review screen opens.
+  - The review screen builds per-campaign detail rows lazily on first
+    expand instead of pre-building thousands of hidden widgets.
+  - The client wizard debounces its search box (one list rebuild 250 ms
+    after typing pauses, instead of a full rebuild per keystroke).
+  - The Advanced Query Builder caches its data scan per mapper session
+    instead of rescanning every level row each time it opens.
+- Confirmed the review screen's data flags are computed from the data
+  (zero-value metrics and rate-mis-alias heuristics in engine.kpi), not
+  hardcoded.
+- Query pivot correctness (tables/charts that ship in reports): the pivot
+  no longer pools rows across breakdown types. With no breakdown type
+  selected it now shows the documented clean campaign-totals table —
+  previously every type's rows were pooled and each type's "Other" bucket
+  summed into one giant bogus top row. A value present in more than one
+  selected type is kept as separate disambiguated rows ("Other (zone)",
+  "Other (dow)") instead of being silently summed. The pivot logic moved
+  to a pure `build_pivot()` function locked by regression tests.
+- Saved Queries render directly below Quick Fill in the mapper sidebar
+  instead of after all breakdown sections.
+- Excel search fixed for re-exports: the writer no longer edits an
+  existing .xlsm in place with openpyxl (which silently dropped the
+  ActiveX search box and corrupted the sheet/VBA wiring — the search broke
+  on every re-export of the same period). Every export now harvests the
+  previous rows, rebuilds the workbook from scratch, and re-injects the
+  VBA search engine; merge semantics (same-key replacement, distinct
+  periods preserved) are unchanged. A stale macro workbook is never left
+  behind holding old data.
+- KPI accuracy against vendor dashboards (traced on a real order where
+  impressions matched the vendor to the digit):
+  - Completion Rate now uses Video Starts as the denominator when the
+    export carries a starts metric (vendor VCR definition), falling back
+    to impressions otherwise. New "Video Starts"/"Starts" aliases.
+  - Cross-campaign Reach/Frequency cannot be deduplicated from campaign
+    aggregates (vendor reach was 3.2x lower than the campaign sum). The
+    review totals are now labeled "Combined Reach (not deduplicated)" and
+    "Avg Campaign Frequency", each with a data flag pointing to the vendor
+    dashboard for order-level numbers. Per-campaign values are unchanged.
+- 249 automated tests pass.
+
 ## July 13, 2026 - MappingModel extraction (mapper roadmap Phase 3)
 
 - Added `app/mapper/mapping_model.py`: `MappingModel` is now the single

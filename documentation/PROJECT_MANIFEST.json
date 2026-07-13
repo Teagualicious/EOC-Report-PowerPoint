@@ -1,7 +1,7 @@
 {
   "project": "Spectrum Reach Reporting Ingestion Engine",
   "state_date": "2026-07-13",
-  "handoff_build": "mapping-model-extraction",
+  "handoff_build": "ui-debugging-batch",
   "entrypoint": "app/main.py",
   "windows_launcher": "Start Ingestion Engine.bat",
   "python": "3.10+",
@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "236 passed",
+  "verified_test_result": "249 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -151,7 +151,7 @@
     },
     {
       "path": "app/engine/excel_search_dashboard.py",
-      "lines": 332,
+      "lines": 334,
       "public_symbols": [
         "NAVY",
         "BLUE",
@@ -171,7 +171,7 @@
         "build_config_rows",
         "build_search_dashboard"
       ],
-      "sha256": "f29e798dc9d2732ec65e7f1cd8a6b74125e9a3dea91eb13e55e2328d9dfbe338"
+      "sha256": "900af07675d566674a986d8eb1029aa0b9f75d3b2dbf5367c56350a9e9e5e320"
     },
     {
       "path": "app/engine/excel_utils.py",
@@ -201,7 +201,7 @@
     },
     {
       "path": "app/engine/excel_writer.py",
-      "lines": 172,
+      "lines": 175,
       "public_symbols": [
         "NAVY",
         "LIGHT_BLUE",
@@ -226,10 +226,9 @@
         "CR_HEADER_FILL",
         "CR_TITLE_FONT",
         "CR_DATE_FONT",
-        "MANAGED_SHEETS",
         "write_to_excel"
       ],
-      "sha256": "9edf938928529026f349668d6eeca4f4931709e0b686333f97b365317a98f936"
+      "sha256": "cb8821cf30d2890e8c5179e95da37e271665decb85ffe1f8a3b85707f048eedb"
     },
     {
       "path": "app/engine/fill_report.py",
@@ -243,13 +242,13 @@
     },
     {
       "path": "app/engine/kpi.py",
-      "lines": 121,
+      "lines": 155,
       "public_symbols": [
         "KPI_METRICS",
         "KPI_ALIASES",
         "compute_kpis"
       ],
-      "sha256": "c746b25a2e135d85f3786cc01503a8918acf9d649df7918ecc6e14dbc55562fd"
+      "sha256": "1e185a14eb29f1b864ae70997efcdf7dec41557b7b93f0c979430b374119c5fb"
     },
     {
       "path": "app/engine/metrics_catalog.py",
@@ -366,19 +365,20 @@
     },
     {
       "path": "app/mapper/query_builder.py",
-      "lines": 418,
+      "lines": 478,
       "public_symbols": [
+        "build_pivot",
         "show_query_builder"
       ],
-      "sha256": "59e795c114fcc346b65825b19579444e9127cb8431512ce1c160a6d2d85ba2f8"
+      "sha256": "853d493e82a1cb1f648103196f3f710101908eddc22f01136be9b0c50194ceb9"
     },
     {
       "path": "app/mapper/sidebar.py",
-      "lines": 215,
+      "lines": 232,
       "public_symbols": [
         "SidebarMixin"
       ],
-      "sha256": "005799dfd714c33ac6df26a8b62e809d5d218aeae24eb144094c7294afd39ead"
+      "sha256": "4d6c4af292fe9106f3c3722680f1da68deca98c6bb7c4017156a0f5712d46cbc"
     },
     {
       "path": "app/mapper/slide_view.py",
@@ -444,35 +444,35 @@
     },
     {
       "path": "app/ui/client_wizard.py",
-      "lines": 291,
+      "lines": 301,
       "public_symbols": [
         "ClientWizard"
       ],
-      "sha256": "3afe47febae5c798bb4cb0f3726d386f8937b4c8e747fc1ef4107f282ab91b54"
+      "sha256": "630fdc2be4d2708b2a4eeb243feb90ebdee4d76095653ce536239307ed006db8"
     },
     {
       "path": "app/ui/main_window.py",
-      "lines": 550,
+      "lines": 555,
       "public_symbols": [
         "IngestionEngine"
       ],
-      "sha256": "042a68e718ba8443b18e0a4af2a28fc346af63c26e7945ae12dbf14d9f86e8d0"
+      "sha256": "161cd24dd9ec99f537e10f395cd49d430ec9351c6f916aee55d8e87383fbd750"
     },
     {
       "path": "app/ui/platform_setup.py",
-      "lines": 227,
+      "lines": 233,
       "public_symbols": [
         "PlatformSetupWindow"
       ],
-      "sha256": "680dbdf25317faea3b9bcfe0ab8f5b637c2a47e058705329f36e1d685ed4773e"
+      "sha256": "84f33b0952ac26879c53e2373eaaa9a936dc302725800e17f817f56edfac5cc9"
     },
     {
       "path": "app/ui/review_view.py",
-      "lines": 442,
+      "lines": 452,
       "public_symbols": [
         "ReviewMixin"
       ],
-      "sha256": "24d5efac63aa64fb821155a05d0c28c89035c1c66aaada2ff2ffa9aa28089e32"
+      "sha256": "fa9443c3c711f51f7382253eb9c923404fb181a5c908567501644aff65ee603f"
     },
     {
       "path": "app/ui/settings_window.py",
@@ -484,7 +484,7 @@
     },
     {
       "path": "app/ui/utils.py",
-      "lines": 244,
+      "lines": 267,
       "public_symbols": [
         "enable_mousewheel",
         "fit_window",
@@ -494,7 +494,7 @@
         "brand_header",
         "run_in_background"
       ],
-      "sha256": "cb9ff0e44ded57f17a6890fc823965bdaa101be14be2ca07166f2dde4a146fa3"
+      "sha256": "16fa7c2c2cc598787b8a46560f7f95bac880bf87c1e07214f9221d58079bd2bf"
     }
   ],
   "ui_validation": "Corrected from Windows laptop photos; Linux/Xvfb smoke screenshots verified main, settings, platform setup, client assignment, and template selector layouts"

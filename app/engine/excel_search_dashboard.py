@@ -177,9 +177,11 @@ def build_config_rows(df):
 def build_search_dashboard(wb, df, dictionary=None):
     """Create Search + hidden _SearchIndex/_Config sheets in the workbook.
 
-    If a Search sheet already exists (xlsm re-export — its VBA code-behind
-    must survive), the layout is left alone and only the hidden data sheets
-    and defined names are rebuilt."""
+    If a Search sheet already exists, the layout is left alone and only the
+    hidden data sheets and defined names are rebuilt. (Defensive only: the
+    writer always passes a freshly built workbook — editing an existing
+    macro workbook in place is exactly what used to break the search on
+    re-export.)"""
     dictionary = dictionary or load_dictionary()
 
     if "Search" in wb.sheetnames:

@@ -67,11 +67,12 @@ class ClientWizard:
         self.window = tk.Toplevel(self.parent)
         assigned_count = len(self.all_campaigns) - len(self.unassigned)
         self.window.title(f"Quick Run — Assign Client ({assigned_count}/{len(self.all_campaigns)} assigned)")
-        fit_window(self.window, 750, 650)
-        try:
-            self.window.state("zoomed")
-        except tk.TclError:
-            logger.debug("Window zoom not supported", exc_info=True)
+        # No state("zoomed") here: zooming a TRANSIENT toplevel on Windows
+        # maximizes over the taskbar, hiding the bottom Next/Back bar on
+        # smaller screens. fit_window clamps to the usable work area
+        # (excludes the taskbar), so every control stays visible; the large
+        # design size fills most of the screen on any display.
+        fit_window(self.window, 1280, 940)
         self.window.configure(bg=t["bg"])
         self.window.transient(self.parent)
         self.window.grab_set()
@@ -234,7 +235,16 @@ class ClientWizard:
                 lbl.bind("<ButtonRelease-1>", drag_end)
 
     def _filter_list(self):
-        self._build_campaign_list()
+        """Debounced: rebuilding hundreds of checkbox rows on every keystroke
+        made searching feel sluggish with large imports. One rebuild fires
+        250ms after typing pauses."""
+        pending = getattr(self, "_filter_after_id", None)
+        if pending:
+            try:
+                self.window.after_cancel(pending)
+            except tk.TclError:
+                pass
+        self._filter_after_id = self.window.after(250, self._build_campaign_list)
 
     def _select_all(self):
         for var in self.campaign_vars.values(): var.set(True)

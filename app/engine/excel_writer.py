@@ -50,12 +50,6 @@ CR_HEADER_FILL = PatternFill("solid", fgColor=NAVY)
 CR_TITLE_FONT = Font(name="Calibri", bold=True, size=22, color="FFFFFF")
 CR_DATE_FONT = Font(name="Calibri", size=12, color="B0C4DE")
 
-MANAGED_SHEETS = ["Unified Data", "Search", "_SearchIndex", "_Config",
-                  "Campaign Dashboard", "Client Report"]  # legacy names cleaned on re-export
-
-
-
-
 def write_to_excel(parsed_data_list, output_path, platform_name="",
                    inject_vba=True):
     """Write the unified workbook: Search dashboard + Unified Data.
@@ -63,51 +57,45 @@ def write_to_excel(parsed_data_list, output_path, platform_name="",
     Attempts to inject the interactive VBA search engine and save as .xlsm
     (Windows + Excel + trust setting required); otherwise leaves a plain
     .xlsx with the data intact. Returns (final_path, vba_error_or_None).
-    """
-    # Re-export continuity: a previous export may have been upgraded to
-    # .xlsm — keep appending to it rather than forking a new .xlsx
-    base, ext = os.path.splitext(output_path)
-    if os.path.exists(base + ".xlsm") and not output_path.lower().endswith(".xlsm"):
-        # xlsm is the live report; a same-name xlsx beside it is a stale
-        # leftover from a locked delete — self-heal and use the xlsm
-        if os.path.exists(output_path):
-            try:
-                os.remove(output_path)
-            except OSError:
-                logger.debug("Stale xlsx still locked", exc_info=True)
-        output_path = base + ".xlsm"
-    is_xlsm = output_path.lower().endswith(".xlsm")
 
-    # Read existing data if file exists
+    The workbook is ALWAYS rebuilt from scratch and the VBA re-injected.
+    The old re-export path edited the existing .xlsm in place with
+    openpyxl, which cannot round-trip macro workbooks: the ActiveX search
+    box was silently dropped and the sheet/VBA wiring corrupted, so the
+    search broke on every re-export of the same period. Existing rows are
+    harvested from the previous file first, so re-export merge semantics
+    (same-key replacement, distinct periods preserved) are unchanged.
+    """
+    base, _ext = os.path.splitext(output_path)
+    xlsx_path = base + ".xlsx"
+    xlsm_path = base + ".xlsm"
+    source_path = None
+    if os.path.exists(xlsm_path):
+        source_path = xlsm_path        # the live report from a prior export
+    elif os.path.exists(xlsx_path):
+        source_path = xlsx_path
+
+    # Harvest existing rows (read-only — the old workbook is never edited)
     existing_rows = []
-    wb = None
-    if os.path.exists(output_path):
+    if source_path:
         try:
-            wb = load_workbook(output_path, keep_vba=is_xlsm)
-        except Exception:
-            logger.warning("Existing report at %s is unreadable — rebuilding "
-                           "it from scratch", output_path, exc_info=True)
-            wb = None
-    if wb is not None:
-        # On .xlsm re-export keep the Search sheet — deleting it would strand
-        # its VBA code-behind; only its hidden data sheets are rebuilt.
-        keep = {"Search"} if is_xlsm else set()
-        if "Unified Data" in wb.sheetnames:
-            ws_old = wb["Unified Data"]
-            if ws_old.max_row >= 2:
-                hdrs = [ws_old.cell(row=1, column=c).value for c in range(1, ws_old.max_column + 1)
-                        if ws_old.cell(row=1, column=c).value]
-                for r in range(2, ws_old.max_row + 1):
-                    rd = {h: ws_old.cell(row=r, column=i+1).value for i, h in enumerate(hdrs)}
+            old_wb = load_workbook(source_path, read_only=True, data_only=True)
+            if "Unified Data" in old_wb.sheetnames:
+                rows_iter = old_wb["Unified Data"].iter_rows(values_only=True)
+                hdrs = next(rows_iter, None) or ()
+                for values in rows_iter:
+                    rd = {h: values[i] for i, h in enumerate(hdrs) if h}
                     if rd.get("metric_name"):
                         existing_rows.append(rd)
-        for name in MANAGED_SHEETS:
-            if name in wb.sheetnames and name not in keep:
-                del wb[name]
-    if wb is None:
-        wb = Workbook()
-        if "Sheet" in wb.sheetnames:
-            del wb["Sheet"]
+            old_wb.close()
+        except Exception:
+            logger.warning("Existing report at %s is unreadable — rebuilding "
+                           "it from scratch", source_path, exc_info=True)
+            existing_rows = []
+
+    wb = Workbook()
+    if "Sheet" in wb.sheetnames:
+        del wb["Sheet"]
 
     # Collect and deduplicate
     new_rows = _collect_rows(parsed_data_list, platform_name)
@@ -155,18 +143,33 @@ def write_to_excel(parsed_data_list, output_path, platform_name="",
     build_search_dashboard(wb, df)
 
     try:
-        wb.save(output_path)
+        wb.save(xlsx_path)
     except PermissionError as e:
         raise PermissionError(
-            f"Cannot write {output_path} — the file is open in Excel. "
+            f"Cannot write {xlsx_path} — the file is open in Excel. "
             "Close it and try again.") from e
-    logger.info("Excel report written: %s (%d data rows)", output_path, len(df))
+    logger.info("Excel report written: %s (%d data rows)", xlsx_path, len(df))
 
     # ── Interactive search: inject VBA and upgrade to .xlsm ──
+    final_path = xlsx_path
     vba_error = None
-    if inject_vba and not is_xlsm:
+    if inject_vba:
         from engine.excel_vba import inject_search_vba
-        output_path, vba_error = inject_search_vba(output_path)
+        final_path, vba_error = inject_search_vba(xlsx_path)
         if vba_error:
             logger.warning("Search VBA not injected: %s", vba_error)
-    return output_path, vba_error
+
+    # Never leave a stale macro workbook beside fresher data: if this
+    # export ended as .xlsx (injection unavailable/failed) the old .xlsm
+    # now holds OUTDATED rows — its data was harvested above, so drop it.
+    if final_path.lower().endswith(".xlsx") and os.path.exists(xlsm_path):
+        try:
+            os.remove(xlsm_path)
+        except OSError:
+            logger.warning("Stale macro workbook is locked: %s", xlsm_path)
+            stale_note = (
+                f"A previous report ({os.path.basename(xlsm_path)}) is open "
+                f"in Excel and shows OLD data — close it. The current data "
+                f"is in {os.path.basename(final_path)}.")
+            vba_error = f"{vba_error}\n\n{stale_note}" if vba_error else stale_note
+    return final_path, vba_error
