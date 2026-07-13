@@ -20,6 +20,9 @@ Private mDimN As Long
 ' interleaved ("client"/"camp"/"level" tokens, or "m:<metric name>").
 Private mColSeq(1 To 67) As String
 Private mColN As Long
+' KPI cards render ONLY when the user explicitly typed metrics — never for
+' the auto-filled default metric set (set per search by RunSearch)
+Private mShowKpis As Boolean
 Private mResLastRow As Long
 Private mResLastCol As Long
 
@@ -78,6 +81,7 @@ Public Sub RunSearch()
     ' typed columns so the typed layout is untouched
     Dim typedMetrics As Boolean
     typedMetrics = (metricCount > 0)
+    mShowKpis = typedMetrics
     If metricCount = 0 Then DefaultMetrics metrics, metricCount
 
     ' Rate metrics derive as 100 * completions / impressions — accumulate
@@ -486,10 +490,10 @@ Private Sub WriteResults(wsS As Worksheet, rowKeys As Object, sums As Object, _
         counts As Object, metrics() As String, metricCount As Long, _
         levelType As String, useClient As Boolean, useCamp As Boolean, _
         useLevel As Boolean, unknownTerms As String)
-    ' Typed pivot table: ONLY the results table renders (no auto KPI strip —
-    ' it added summary boxes and aggregations the user never asked for),
-    ' and columns follow mColSeq: the exact typed order, dimensions and
-    ' metrics interleaved as written.
+    ' Typed pivot table: columns follow mColSeq — the exact typed order,
+    ' dimensions and metrics interleaved as written. KPI summary cards
+    ' render only with a reason: explicitly typed metrics (mShowKpis) and
+    ' more than one result row (a single row is already its own total).
     Application.ScreenUpdating = False
     wsS.Range(wsS.Cells(RESULTS_ROW, 2), wsS.Cells(RESULTS_ROW + 5000, 60)).Clear
 
@@ -500,6 +504,72 @@ Private Sub WriteResults(wsS As Worksheet, rowKeys As Object, sums As Object, _
         wsS.Cells(r, 2).Font.Italic = True
         wsS.Cells(r, 2).Font.Color = RGB(180, 100, 0)
         r = r + 1
+    End If
+
+    ' KPI strip for typed metrics (typed order, up to 4 cards)
+    If mShowKpis And rowKeys.Count > 1 Then
+        Dim kpiShown As Long, km As Long
+        kpiShown = 0
+        For km = 1 To metricCount
+            If kpiShown >= 4 Then Exit For
+            Dim kAgg As String, kTotal As Double, kCnt As Long, kk2 As Variant
+            kAgg = MetricAgg(metrics(km))
+            kTotal = 0#: kCnt = 0
+            For Each kk2 In sums.keys
+                Dim p2() As String
+                p2 = Split(CStr(kk2), Chr$(1))
+                If UBound(p2) >= 1 Then
+                    If StrComp(p2(1), metrics(km), vbTextCompare) = 0 Then
+                        kTotal = kTotal + sums(kk2)
+                        kCnt = kCnt + counts(kk2)
+                    End If
+                End If
+            Next kk2
+            If kAgg = "rate" Then
+                Dim gImp As Double, gNum As Double, kr As Variant
+                gImp = 0#: gNum = 0#
+                For Each kr In sums.keys
+                    Dim p3() As String
+                    p3 = Split(CStr(kr), Chr$(1))
+                    If UBound(p3) >= 1 Then
+                        If p3(1) = Chr$(4) & "IMP" Then gImp = gImp + sums(kr)
+                        If p3(1) = Chr$(4) & "NUM" Then gNum = gNum + sums(kr)
+                    End If
+                Next kr
+                If gImp > 0 Then
+                    kTotal = 100# * gNum / gImp
+                    kCnt = 1
+                End If
+            End If
+            If kCnt > 0 Then
+                If kAgg = "avg" Then kTotal = kTotal / kCnt
+                Dim kc As Long
+                kc = 2 + kpiShown * 2
+                With wsS.Range(wsS.Cells(r, kc), wsS.Cells(r, kc + 1))
+                    .Merge
+                    .Value = Format$(kTotal, IIf(kTotal = Int(kTotal), "#,##0", "#,##0.00"))
+                    .Font.Size = 15
+                    .Font.Bold = True
+                    .Font.Color = RGB(0, 48, 87)
+                    .HorizontalAlignment = xlCenter
+                    .Interior.Color = RGB(238, 242, 247)
+                End With
+                With wsS.Range(wsS.Cells(r + 1, kc), wsS.Cells(r + 1, kc + 1))
+                    .Merge
+                    .Value = UCase$(metrics(km))
+                    .Font.Size = 7
+                    .Font.Bold = True
+                    .Font.Color = RGB(107, 122, 144)
+                    .HorizontalAlignment = xlCenter
+                    .Interior.Color = RGB(238, 242, 247)
+                End With
+                kpiShown = kpiShown + 1
+            End If
+        Next km
+        If kpiShown > 0 Then
+            wsS.Rows(r).RowHeight = 22
+            r = r + 3
+        End If
     End If
 
     ' Header in unified column order

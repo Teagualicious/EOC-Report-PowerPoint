@@ -20,7 +20,9 @@ Search grammar (mirrored by the VBA in excel_vba.py):
     order — dimensions and metrics interleaved as written. Untyped implied
     dimensions (default campaign rows, campaign-name filters) render
     first; when no metric is typed, the _Config defaults append last.
-  - No auto KPI/summary boxes — only the results table renders.
+  - KPI summary cards render only with a reason: metrics the user
+    EXPLICITLY typed (never the auto-filled defaults) and more than one
+    result row (a single row is already its own total).
   - No level terms -> rows are campaigns (totals view).
 """
 

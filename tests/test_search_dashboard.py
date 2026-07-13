@@ -179,15 +179,16 @@ class TestVbaContract:
         assert f"Const SUGGEST_ROW As Long = {SUGGEST_ROW}" in src
 
     def test_typed_pivot_contract(self):
-        """The search renders ONLY the results table, with columns in the
-        exact typed order (mColSeq) — no auto KPI/summary boxes. Locked
-        after real reports showed unrequested aggregate boxes and
+        """Columns render in the exact typed order (mColSeq), and KPI
+        summary cards are GATED: only for explicitly typed metrics
+        (mShowKpis) with more than one result row. Locked after real
+        reports showed unrequested aggregate boxes and
         dims-before-metrics reordering."""
         src = self._bas()
-        assert "Auto KPI strip" not in src
         assert "mColSeq" in src
-        assert "exact typed order" in src.lower() or \
-               "EXACT typed order" in src
+        assert "exact typed order" in src.lower()
+        assert "mShowKpis = typedMetrics" in src
+        assert "If mShowKpis And rowKeys.Count > 1 Then" in src
 
 
 def test_copy_chip_present(df=None):
