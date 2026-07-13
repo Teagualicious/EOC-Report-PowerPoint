@@ -52,7 +52,8 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-13 — MappingModel keeps the persisted mapping schema byte-compatible (legacy shape-level single assignments included) — old user mappings and `engine.pptx_fill` must keep working without migration.
 - 2026-07-13 — Chart/table live-preview updates stay outside the model — they use transient query-builder data that is not mapping state and re-adding them is not idempotent.
 - 2026-07-13 — v1.24.0 released (PR #5, MappingModel extraction) via the Release workflow.
-- 2026-07-13 — Releases became push-driven: the Release workflow now fires on any push to main that changes the root `VERSION` file (tag + GitHub Release from the CHANGELOG top entry; already-released versions are skipped). Chosen because remote sessions cannot push tags or call the GitHub API when the connector is unavailable — bumping VERSION inside the PR makes merging the release action. Manual dispatch kept as fallback. v1.25.0 (Windows debugging batch, PR #8 + this change) releases on merge.
+- 2026-07-13 — Releases became push-driven: the Release workflow now fires on any push to main that changes the root `VERSION` file (tag + GitHub Release from the CHANGELOG top entry; already-released versions are skipped). Chosen because remote sessions cannot push tags or call the GitHub API when the connector is unavailable — bumping VERSION inside the PR makes merging the release action. Manual dispatch kept as fallback.
+- 2026-07-13 — **v1.25.0 released** (PRs #8/#9, Windows debugging batch + push-driven releases) — first release published by the new VERSION-file trigger, tag on main merge commit 6665fbe.
 
 ## Noticed (not yet acted on)
 
