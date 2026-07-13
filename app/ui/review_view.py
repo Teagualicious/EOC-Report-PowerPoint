@@ -76,8 +76,12 @@ class ReviewMixin:
         content_canvas.pack(side="left", fill="both", expand=True)
         content_sb.pack(side="right", fill="y")
 
-        # KPI calculation
-        kpi_totals, campaign_details, flags = compute_kpis(export_result["client_data"])
+        # KPI values are precomputed in the background export pass
+        # (main_window._on_wizard_complete); computing them here froze the
+        # UI for large clients. Fallback stays for any caller without them.
+        kpi_totals, campaign_details, flags = (
+            export_result.get("kpi")
+            or compute_kpis(export_result["client_data"]))
 
         # Which campaigns do the flags implicate? (mixed shapes: tuples
         # (campaign, metric, message) and plain strings)
@@ -198,26 +202,32 @@ class ReviewMixin:
                 tk.Label(ch, text="  |  ".join(summary), font=("Segoe UI", 9),
                          bg=t["card"], fg=t["muted"]).pack(side="right", padx=10)
             detail = tk.Frame(cf, bg=t["bg"])
-            detail.pack(fill="x", padx=15, pady=(0, 5))
-            detail.pack_forget()
-            for met, val in sorted(metrics.items()):
-                row = tk.Frame(detail, bg=t["bg"])
-                row.pack(fill="x", pady=1)
-                tk.Label(row, text=met, font=("Segoe UI", 9), bg=t["bg"],
-                         fg=t["muted"], width=22, anchor="w").pack(side="left")
-                if isinstance(val, float) and val == int(val): vd = f"{int(val):,}"
-                elif isinstance(val, float): vd = f"{val:,.2f}"
-                elif isinstance(val, int): vd = f"{val:,}"
-                else: vd = str(val)
-                tk.Label(row, text=vd, font=("Segoe UI", 9, "bold"), bg=t["bg"],
-                         fg=t["fg"]).pack(side="left")
-            def toggle(event, d=detail, h=ch):
+
+            # Detail rows build lazily on first expand: creating them up
+            # front for every campaign meant thousands of hidden widgets on
+            # large imports and a visibly slow review screen.
+            def _build_detail(d=detail, mets=metrics):
+                for met, val in sorted(mets.items()):
+                    row = tk.Frame(d, bg=t["bg"])
+                    row.pack(fill="x", pady=1)
+                    tk.Label(row, text=met, font=("Segoe UI", 9), bg=t["bg"],
+                             fg=t["muted"], width=22, anchor="w").pack(side="left")
+                    if isinstance(val, float) and val == int(val): vd = f"{int(val):,}"
+                    elif isinstance(val, float): vd = f"{val:,.2f}"
+                    elif isinstance(val, int): vd = f"{val:,}"
+                    else: vd = str(val)
+                    tk.Label(row, text=vd, font=("Segoe UI", 9, "bold"), bg=t["bg"],
+                             fg=t["fg"]).pack(side="left")
+
+            def toggle(event, d=detail, h=ch, build=_build_detail):
                 if d.winfo_manager():
                     d.pack_forget()
                     for w in h.winfo_children():
                         if isinstance(w, tk.Label) and "▾" in str(w.cget("text")):
                             w.config(text=w.cget("text").replace("▾", "▸")); break
                 else:
+                    if not d.winfo_children():
+                        build()
                     d.pack(fill="x", padx=15, pady=(0, 5))
                     for w in h.winfo_children():
                         if isinstance(w, tk.Label) and "▸" in str(w.cget("text")):

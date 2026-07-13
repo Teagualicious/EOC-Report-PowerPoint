@@ -12,6 +12,18 @@ from engine.query_resolver import get_available_breakdowns
 logger = logging.getLogger(__name__)
 
 
+def _auto_query_name(query, existing):
+    """Readable sidebar name for an unnamed applied query, unique among
+    ``existing`` names."""
+    base = f"Query: {query.get('metric', 'Value')} ({query.get('agg', 'sum')})"
+    name = base
+    counter = 2
+    while name in existing:
+        name = f"{base} {counter}"
+        counter += 1
+    return name
+
+
 def show_query_builder(wizard):
     """Open the advanced query builder; writes the chosen query/metric back
     onto the wizard (selected_metric, _pending_query, _pending_table_data,
@@ -24,39 +36,51 @@ def show_query_builder(wizard):
     win.configure(bg=t["bg"]); win.transient(wizard.window); win.grab_set()
     win.lift(); win.focus_force()
 
-    # Collect raw data into DataFrame for filtering
-    raw_rows = []
-    all_campaigns = set()
-    for data in wizard.export_result["client_data"]:
-        for mdata in data.get("campaign_metrics", {}).values():
-            mn = mdata.get("universal_name", "")
-            mv = mdata.get("value", 0)
-            camp = mdata.get("campaign_name", "")
-            if mn and isinstance(mv, (int, float)):
-                raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
-                                 "source": "campaign", "level_value": ""})
-                all_campaigns.add(camp)
-        for ld in data.get("level_data", []):
-            mn = ld.get("metric_name", "")
-            mv = ld.get("metric_value", 0)
-            ml = ld.get("metric_level", "")
-            camp = ld.get("_campaign", "")
-            prefix = ml.split(":")[0] if ":" in ml else ml
-            lv = ml.split(":", 1)[1] if ":" in ml else ""
-            if mn and isinstance(mv, (int, float)):
-                raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
-                                 "source": prefix, "level_value": lv})
-                all_campaigns.add(camp)
+    # Collect raw data into a DataFrame for filtering. The scan is
+    # O(all level rows), so it is cached per mapper session — client_data
+    # never changes for an open wizard, and rebuilding it on every open of
+    # the query builder made large imports feel frozen.
+    cache = getattr(wizard, "_query_builder_cache", None)
+    if cache is None:
+        raw_rows = []
+        all_campaigns = set()
+        for data in wizard.export_result["client_data"]:
+            for mdata in data.get("campaign_metrics", {}).values():
+                mn = mdata.get("universal_name", "")
+                mv = mdata.get("value", 0)
+                camp = mdata.get("campaign_name", "")
+                if mn and isinstance(mv, (int, float)):
+                    raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
+                                     "source": "campaign", "level_value": ""})
+                    all_campaigns.add(camp)
+            for ld in data.get("level_data", []):
+                mn = ld.get("metric_name", "")
+                mv = ld.get("metric_value", 0)
+                ml = ld.get("metric_level", "")
+                camp = ld.get("_campaign", "")
+                prefix = ml.split(":")[0] if ":" in ml else ml
+                lv = ml.split(":", 1)[1] if ":" in ml else ""
+                if mn and isinstance(mv, (int, float)):
+                    raw_rows.append({"campaign": camp, "metric": mn, "value": mv,
+                                     "source": prefix, "level_value": lv})
+                    all_campaigns.add(camp)
+        cache = {
+            "df": pd.DataFrame(raw_rows) if raw_rows else None,
+            "campaigns": sorted(all_campaigns),
+            "breakdowns": get_available_breakdowns(
+                wizard.export_result["client_data"]),
+        }
+        wizard._query_builder_cache = cache
 
-    if not raw_rows:
+    if cache["df"] is None:
         messagebox.showwarning("No Data", "No metric data available.")
         win.destroy(); return
 
-    full_df = pd.DataFrame(raw_rows)
+    full_df = cache["df"]
     metrics_list = sorted(full_df["metric"].unique())
     sources_list = sorted(full_df["source"].unique())
-    campaigns_list = sorted(all_campaigns)
-    breakdowns = get_available_breakdowns(wizard.export_result["client_data"])
+    campaigns_list = cache["campaigns"]
+    breakdowns = cache["breakdowns"]
 
     # ── Top controls row ──
     ctrl = tk.Frame(win, bg=t["bg"])
@@ -267,11 +291,13 @@ def show_query_builder(wizard):
             refresh_pivot()
             q = pivot_result.get("query", {})
         if not q: return
-        qname = qname_var.get().strip()
-        if qname:
-            key = qname                      # human name -> sidebar metric
-        else:
-            key = f"__query_{q.get('metric', '')}_{hash(str(q))}__"
+        # Every applied query becomes a visible sidebar metric: the typed
+        # name if given, otherwise a readable auto-name. Apply used to arm
+        # an invisible selection when the name was blank — nothing appeared
+        # in Metrics & Values and users assumed the button did nothing.
+        if not hasattr(wizard, "named_queries"):
+            wizard.named_queries = {}
+        key = qname_var.get().strip() or _auto_query_name(q, wizard.named_queries)
         # Resolve value
         piv = pivot_result.get("df")
         if piv is not None:
@@ -319,19 +345,18 @@ def show_query_builder(wizard):
             q["output"] = "chart"
         else:
             q["output"] = "value"
-        if qname:
-            if not hasattr(wizard, "named_queries"):
-                wizard.named_queries = {}
-            wizard.named_queries[qname] = {"query": dict(q)}
+        wizard.named_queries[key] = {"query": dict(q)}
         wizard.selected_metric = key
         wizard._pending_query = q
         wizard._pending_image = None
-        # Named queries appear in the sidebar metric list for reuse
+        # The applied query appears in the sidebar (Saved Queries) armed for
+        # assignment — click a shape to place it, or re-click it later.
         try:
-            if qname and hasattr(wizard, "_refresh_metrics"):
+            if hasattr(wizard, "_refresh_metrics"):
                 wizard._refresh_metrics()
         except Exception:
-            pass
+            logger.warning("Sidebar refresh after query apply failed",
+                           exc_info=True)
         win.destroy()
 
     tk.Button(bottom, text="Apply as Value", font=("Calibri", 10),

@@ -15,6 +15,7 @@ from config.themes import get_theme
 from engine.data_pipeline import apply_platform_config, filter_data_by_campaigns
 from engine.errors import IngestionError
 from engine.excel_writer import write_to_excel
+from engine.kpi import compute_kpis
 from parsers.csv_parser import CSVParser
 from parsers.excel_parser import ExcelParser
 from parsers.html_parser import HTMLParser
@@ -509,6 +510,10 @@ class IngestionEngine(ReviewMixin):
                         "output_path": final_path,
                         "rows": rows,
                         "folder": client_folder,
+                        # Precomputed here, off the Tk thread — building the
+                        # KPI DataFrame for a large client froze the UI when
+                        # the review screen opened.
+                        "kpi": compute_kpis(client_data),
                     })
                 except Exception as exc:
                     logger.exception("Excel export failed for %s", client_name)

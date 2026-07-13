@@ -111,28 +111,34 @@ class PlatformSetupWindow:
                  font=("Segoe UI", 11, "bold"), bg=t["accent"], fg="white"
                  ).pack(fill="x", padx=10, pady=5)
 
+        # One shared grid per sheet: header and every column row live in the
+        # SAME grid so the Role/Sample columns line up exactly. The previous
+        # one-frame-per-row layout gave each row its own grid — long sample
+        # text in one row shifted that row's columns, so the dropdowns
+        # appeared staggered/floating relative to their neighbors.
         col_frame = tk.Frame(self.scroll_frame, bg=t["card"])
         col_frame.pack(fill="x", padx=5)
+        col_frame.columnconfigure(1, weight=2, minsize=180)
+        col_frame.columnconfigure(2, weight=1, minsize=150)
+        col_frame.columnconfigure(3, weight=2, minsize=180)
 
-        hdr_row = tk.Frame(col_frame, bg=t["highlight"]); hdr_row.pack(fill="x")
-        hdr_row.columnconfigure(1, weight=2, minsize=180)
-        hdr_row.columnconfigure(2, weight=1, minsize=150)
-        hdr_row.columnconfigure(3, weight=2, minsize=180)
-        tk.Label(hdr_row, text="Extract", font=("Segoe UI", 9, "bold"), bg=t["highlight"],
-                 fg=t["fg"]).grid(row=0, column=0, padx=9, pady=5)
-        tk.Label(hdr_row, text="Column", font=("Segoe UI", 9, "bold"), bg=t["highlight"],
-                 fg=t["fg"], anchor="w").grid(row=0, column=1, sticky="ew", padx=5)
-        tk.Label(hdr_row, text="Role", font=("Segoe UI", 9, "bold"), bg=t["highlight"],
-                 fg=t["fg"], anchor="w").grid(row=0, column=2, sticky="ew", padx=5)
-        tk.Label(hdr_row, text="Sample", font=("Segoe UI", 9, "bold"), bg=t["highlight"],
-                 fg=t["fg"], anchor="w").grid(row=0, column=3, sticky="ew", padx=5)
+        hdr_kw = {"font": ("Segoe UI", 9, "bold"), "bg": t["highlight"],
+                  "fg": t["fg"]}
+        tk.Label(col_frame, text="Extract", **hdr_kw).grid(
+            row=0, column=0, sticky="nsew", ipadx=9, ipady=5)
+        tk.Label(col_frame, text="Column", anchor="w", **hdr_kw).grid(
+            row=0, column=1, sticky="nsew", ipadx=5, ipady=5)
+        tk.Label(col_frame, text="Role", anchor="w", **hdr_kw).grid(
+            row=0, column=2, sticky="nsew", ipadx=5, ipady=5)
+        tk.Label(col_frame, text="Sample", anchor="w", **hdr_kw).grid(
+            row=0, column=3, sticky="nsew", ipadx=5, ipady=5)
 
         role_options = ["metric", "campaign_id", "level: date", "level: device", "level: daypart",
                         "level: hour", "level: dow", "level: zip", "level: dma",
                         "level: audience", "level: creative", "level: keyword",
                         "level: network", "skip"]
 
-        for col_name in sheet["headers"]:
+        for grid_row, col_name in enumerate(sheet["headers"], start=1):
             auto_role = "metric"; auto_selected = True
             ctx_cols = classification["context"]
             lvl_cols = classification["levels"]
@@ -152,24 +158,24 @@ class PlatformSetupWindow:
 
             sel_var = tk.BooleanVar(value=auto_selected)
             role_var = tk.StringVar(value=auto_role)
-            row = tk.Frame(col_frame, bg=t["card"]); row.pack(fill="x", pady=1)
-            row.columnconfigure(1, weight=2, minsize=180)
-            row.columnconfigure(2, weight=1, minsize=150)
-            row.columnconfigure(3, weight=2, minsize=180)
-            tk.Checkbutton(row, variable=sel_var, bg=t["card"],
-                           selectcolor=t["input_bg"]).grid(row=0, column=0, padx=9, pady=2)
-            tk.Label(row, text=col_name, font=("Segoe UI", 10), bg=t["card"],
+            tk.Checkbutton(col_frame, variable=sel_var, bg=t["card"],
+                           selectcolor=t["input_bg"]).grid(
+                               row=grid_row, column=0, padx=9, pady=2)
+            tk.Label(col_frame, text=col_name, font=("Segoe UI", 10), bg=t["card"],
                      fg=t["card_fg"], anchor="w").grid(
-                         row=0, column=1, sticky="ew", padx=5)
-            ttk.Combobox(row, textvariable=role_var, values=role_options,
-                         state="readonly").grid(row=0, column=2, sticky="ew", padx=5)
+                         row=grid_row, column=1, sticky="ew", padx=5, pady=1)
+            ttk.Combobox(col_frame, textvariable=role_var, values=role_options,
+                         state="readonly").grid(
+                             row=grid_row, column=2, sticky="ew", padx=5, pady=1)
             sv = str(sample.get(col_name, ""))[:40]
-            tk.Label(row, text=sv, font=("Segoe UI", 9), bg=t["card"],
+            tk.Label(col_frame, text=sv, font=("Segoe UI", 9), bg=t["card"],
                      fg=t["muted"], anchor="w").grid(
-                         row=0, column=3, sticky="ew", padx=5)
+                         row=grid_row, column=3, sticky="ew", padx=5, pady=1)
             config_data["columns"][col_name] = {"selected": sel_var, "role": role_var}
 
-        btn_row = tk.Frame(col_frame, bg=t["card"]); btn_row.pack(fill="x", pady=5)
+        btn_row = tk.Frame(col_frame, bg=t["card"])
+        btn_row.grid(row=len(sheet["headers"]) + 1, column=0, columnspan=4,
+                     sticky="ew", pady=5)
         def _all(cd=config_data):
             for v in cd["columns"].values(): v["selected"].set(True)
         def _none(cd=config_data):

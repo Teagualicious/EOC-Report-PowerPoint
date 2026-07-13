@@ -4,7 +4,7 @@
 
 ## Current phase
 
-Phase 2 — Mapper roadmap Phase 3: MappingModel extraction (complete, released as v1.24.0)
+Phase 3 — Windows debugging batch (complete): wheel/layout fixes, query-builder UX, UI performance
 
 The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
@@ -20,7 +20,15 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - New `app/mapper/mapping_model.py`: `MappingModel` owns all template-mapping state (assignments, images, skip, per-metric format prefs). Pure Python — fully covered by the automated suite.
   - `mapper_window` / `slide_view` / `format_popup` route every mutation through the model; the wizard subscribes and re-renders the shape panel + live COM preview from model state on each change. `wizard.mapping` and `wizard._metric_formats`/`_metric_format_details` are now read-only views onto the model.
   - Persisted schema unchanged (incl. legacy shape-level single assignments); assignment semantics preserved verbatim (update-in-place, replace-all confirmation, format propagation).
-  - 15 new model unit tests; 236 tests pass; `python -m compileall -q app tests` clean. All 221 pre-refactor tests pass unchanged (the golden-suite acceptance gate).
+  - 15 new model unit tests; 236 tests pass; `python -m compileall -q app tests` clean. All 221 pre-refactor tests pass unchanged (the golden-suite acceptance gate). Released as v1.24.0.
+- Phase 3 (2026-07-13) — Windows debugging batch (from on-site photos):
+  - Mouse wheel can no longer change a closed combobox's value anywhere (class-binding override in `ui.utils.enable_mousewheel`; wheel scrolls the surrounding pane instead). This was silently corrupting Platform Setup role selections.
+  - Platform Setup uses one grid per sheet so Role/Sample columns align across rows.
+  - Client wizard no longer zooms over the taskbar; `fit_window(1280, 940)` clamps to the work area so Next/Back are always visible (resolves the roadmap's zoomed-vs-fit_window question in favor of fit_window).
+  - Advanced Query Builder "Apply as ..." always creates a visible sidebar metric (typed name or auto-name), re-armable from Saved Queries; armed selection renders highlighted.
+  - Verified review data flags are computed (engine.kpi zero-value + rate-mis-alias heuristics), not hardcoded.
+  - Performance: KPI compute moved into the background export pass; review detail rows build lazily on expand; client-wizard search debounced (250 ms); query-builder data scan cached per mapper session.
+  - 239 tests pass (3 new).
 
 ## Next up
 
@@ -52,6 +60,8 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - Two `tests/test_ui_helpers.py` DPI tests import `ui.utils` and therefore need a Python built with tkinter (GitHub Actions setup-python and standard Windows installs have it; minimal Linux builds may not).
 - Toggling a shape's Skip checkbox replaces its whole mapping and silently discards existing assignments (pre-model behavior, deliberately preserved and locked by `test_set_skip_replaces_shape_mapping`). Decide in mapper Phase 5 whether skip should preserve assignments.
 - `PPTXWizard.image_paths` is an unused leftover attribute.
+- Query-builder queries carry `campaigns`/`sources`/`values`/`top_n` keys, but `engine.query_resolver.resolve_query()` only honors `metric`/`breakdown`/`filter`/`agg` — a re-resolved builder query (e.g. review auto-fill in a later session) can differ from the pivot total shown at apply time. In-session fills use the cached value and are correct. Needs a resolver extension or query translation.
+- Opening the mapper computes `get_available_metrics()` on the Tk thread — noticeable but tolerable on large imports; move behind `run_in_background` if it becomes a complaint.
 
 ## How to run
 
