@@ -58,7 +58,7 @@ python -m pytest tests -q
 python -m compileall -q app tests
 ```
 
-Current verified baseline: **221 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
+Current verified baseline: **236 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
 
 For Windows releases, also complete the Office acceptance checks in `documentation/TESTING_AND_RELEASE.md`. Linux/macOS test success does not validate Excel VBA injection or PowerPoint COM behavior.
 
@@ -108,7 +108,8 @@ For Windows releases, also complete the Office acceptance checks in `documentati
 - `app/ui/settings_window.py` — platforms, appearance, templates, logs.
 - `app/ui/platform_setup.py` — mapping platform export columns.
 - `app/ui/utils.py` — approved shared widgets/styles/background-task helper.
-- `app/mapper/` — PowerPoint mapper window, sidebar, slide view, format/query dialogs.
+- `app/mapper/mapping_model.py` — `MappingModel`, the single owner of template-mapping state; all mapper mutations go through it and observers re-render from it.
+- `app/mapper/` — PowerPoint mapper window, sidebar, slide view, format/query dialogs (render and gather input only — mapping mutations belong in the model).
 
 ## 5. Non-negotiable business invariants
 

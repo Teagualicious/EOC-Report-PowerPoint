@@ -58,7 +58,7 @@ The default generated reports are written to `output/<client>/`. A different out
 
 ## Current validation status
 
-- 221 automated tests pass (run `pytest` from the repo root).
+- 236 automated tests pass (run `pytest` from the repo root).
 - All Python modules compile.
 - The Tkinter application launches in a graphical smoke test.
 - CSV and Excel large-file performance was improved in the July 10, 2026 review.

@@ -15,6 +15,7 @@ from config.paths import TEMPLATES_DIR
 from engine.pptx_mapper import (SPECIAL_METRICS, fill_template,
                                 get_available_metrics, load_template_mapping,
                                 save_template_mapping, scan_template)
+from mapper.mapping_model import MappingModel
 from mapper.query_builder import show_query_builder
 from mapper.sidebar import SidebarMixin
 from mapper.slide_view import SlideViewMixin
@@ -37,12 +38,12 @@ class PPTXWizard(SidebarMixin, SlideViewMixin):
         self.template_path = template_path
         self.slides = []
         self.current_slide = 0
-        self.mapping = {"slides": {}}
+        # Single owner of mapping state — the Tk panels and the live COM
+        # preview re-render from it after every mutation (see _on_model_change)
+        self.model = MappingModel()
         self.selected_metric = None
         self.image_paths = {}
         self.original_texts = {}
-        self._metric_formats = {}  # metric_key -> format string
-        self._metric_format_details = {}  # metric_key -> format config
         self._pending_query = None
         self._pending_image = None
         self.live_preview = None  # COM-based live preview
@@ -92,7 +93,8 @@ class PPTXWizard(SidebarMixin, SlideViewMixin):
                 self.original_texts[key] = shape.get("text", "")
 
         saved = self.load_mapping(os.path.basename(self.template_path))
-        if saved: self.mapping = saved
+        if saved: self.model = MappingModel(saved)
+        self.model.subscribe(self._on_model_change)
 
         # Launch live PowerPoint preview
         try:
@@ -254,6 +256,26 @@ class PPTXWizard(SidebarMixin, SlideViewMixin):
                   command=self._save_only).pack(side="right", padx=5)
 
         self._show_slide()
+
+    # Compatibility views onto the model — every read the mixins and the
+    # save/fill paths do goes to the same single source of truth.
+    @property
+    def mapping(self):
+        return self.model.data
+
+    @property
+    def _metric_formats(self):
+        return self.model.metric_formats
+
+    @property
+    def _metric_format_details(self):
+        return self.model.metric_format_details
+
+    def _on_model_change(self, event, slide_num=None, shape_id=None, metric=None):
+        """Model observer: re-render the current slide (shape panel + live
+        preview re-apply) after every mapping mutation."""
+        if hasattr(self, "window") and self.window.winfo_exists():
+            self._show_slide()
 
     def _on_preview_disabled(self, reason):
         """Live preview turned itself off after repeated COM errors —

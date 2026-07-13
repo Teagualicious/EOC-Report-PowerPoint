@@ -1,7 +1,7 @@
 {
   "project": "Spectrum Reach Reporting Ingestion Engine",
   "state_date": "2026-07-13",
-  "handoff_build": "repo-integration-fill-tracking",
+  "handoff_build": "mapping-model-extraction",
   "entrypoint": "app/main.py",
   "windows_launcher": "Start Ingestion Engine.bat",
   "python": "3.10+",
@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "221 passed",
+  "verified_test_result": "236 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -337,19 +337,32 @@
     },
     {
       "path": "app/mapper/format_popup.py",
-      "lines": 168,
+      "lines": 166,
       "public_symbols": [
         "show_format_popup"
       ],
-      "sha256": "ad50a92980d554e41e0a23532332e1e6f8a0f42d4694d555fa7ebceeeb1f0348"
+      "sha256": "ca30df1fbff834c498332373c0120cac544430beddec4e080a87319ad2817bf1"
     },
     {
       "path": "app/mapper/mapper_window.py",
-      "lines": 350,
+      "lines": 372,
       "public_symbols": [
         "PPTXWizard"
       ],
-      "sha256": "14773140fab7026876278cbf6f49d525a3eeb3de2bbcd45138527154957a8bec"
+      "sha256": "46d57deabbaf7b8f795b96b9c140aae952923650f21bdde3b8e06c4d51b14c09"
+    },
+    {
+      "path": "app/mapper/mapping_model.py",
+      "lines": 222,
+      "public_symbols": [
+        "CREATED",
+        "APPENDED",
+        "UPDATED",
+        "REPLACED",
+        "NEEDS_CONFIRM",
+        "MappingModel"
+      ],
+      "sha256": "98a1dc7ad96e7dfa3b146b2c3c3abbaf218a03a45d4b0e324f0c07bff88a4501"
     },
     {
       "path": "app/mapper/query_builder.py",
@@ -369,11 +382,11 @@
     },
     {
       "path": "app/mapper/slide_view.py",
-      "lines": 454,
+      "lines": 346,
       "public_symbols": [
         "SlideViewMixin"
       ],
-      "sha256": "941a99146ceb5263af0e4916d4668e8b7a80194261962ae170ed33dbba914d59"
+      "sha256": "0bb1be608b2acd512561dbe7cc4ae369356c5bb8949eff053a33152767edced4"
     },
     {
       "path": "app/parsers/__init__.py",

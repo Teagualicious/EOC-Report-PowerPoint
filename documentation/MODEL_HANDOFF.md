@@ -11,7 +11,7 @@ For AI-assisted work, read root `AI_CONTEXT.md` first, then use this document as
 
 The reviewed and reorganized build is healthy:
 
-- 221 automated tests pass with `python -m pytest tests -q`.
+- 236 automated tests pass with `python -m pytest tests -q`.
 - All Python files compile.
 - The Tkinter application launches successfully in a graphical smoke test.
 - Parsing and Excel generation run in background threads so the UI remains responsive.
@@ -219,6 +219,7 @@ PowerPoint templates live in `workspace/templates/`. Image assets live in `works
 - `ui.utils.fit_window()` compensates for Windows display scaling. New top-level windows should use it rather than raw geometry strings, and expandable canvases should live in their own container with action bars reserved above or below them. See `reviews/UI_REVIEW_2026-07-10.md` for the regressions this prevents.
 - `ui.utils.run_in_background()` is the approved pattern for long-running work. Background workers must not touch Tk widgets directly; use the success/error callbacks scheduled on the root event loop.
 - `mapper.mapper_window.PPTXWizard` combines `SidebarMixin` and `SlideViewMixin` for template mapping.
+- `mapper.mapping_model.MappingModel` is the single owner of template-mapping state. Every mutation (assign metric/image, skip, clear, per-metric format change) goes through the model; the wizard subscribes to it, and the shape panel and live COM preview re-render from model state after each change. Do not mutate `wizard.mapping` dicts directly — add a model method instead and keep the persisted schema unchanged.
 
 Keep Tk operations on the main thread.
 
@@ -283,7 +284,7 @@ Use `documentation/TESTING_AND_RELEASE.md` before release.
 Before editing:
 
 1. Read this file and `CURRENT_ARCHITECTURE.md`.
-2. Run the 221-test suite.
+2. Run the 236-test suite.
 3. Identify whether the change affects Windows COM, Tkinter threading, metric aggregation, or persisted mappings.
 
 After editing:
