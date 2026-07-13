@@ -13,8 +13,13 @@ Private mCfgN As Long
 
 ' Extent of the currently displayed results table (set by WriteResults)
 Private mResHeaderRow As Long
-Private mDimSeq(1 To 3) As String   ' typed order of dimensions
+Private mDimSeq(1 To 3) As String   ' dimension order (subset of mColSeq)
 Private mDimN As Long
+' Unified column sequence — the search is a TYPED PIVOT TABLE: columns
+' render in the exact order the user typed them, dimensions and metrics
+' interleaved ("client"/"camp"/"level" tokens, or "m:<metric name>").
+Private mColSeq(1 To 67) As String
+Private mColN As Long
 Private mResLastRow As Long
 Private mResLastCol As Long
 
@@ -64,11 +69,15 @@ Public Sub RunSearch()
     levelValues.CompareMode = vbTextCompare
     camps.CompareMode = vbTextCompare
     Dim unknownTerms As String
-    Dim dimOrder As String
-    dimOrder = "|"
+    Dim colOrder As String
+    colOrder = "|"
     ParseTerms raw, metrics, metricCount, levelType, levelValues, camps, _
-               campGroup, clientGroup, unknownTerms, dimOrder
+               campGroup, clientGroup, unknownTerms, colOrder
 
+    ' No metric typed -> the _Config defaults fill in, appended AFTER the
+    ' typed columns so the typed layout is untouched
+    Dim typedMetrics As Boolean
+    typedMetrics = (metricCount > 0)
     If metricCount = 0 Then DefaultMetrics metrics, metricCount
 
     ' Rate metrics derive as 100 * completions / impressions — accumulate
@@ -98,30 +107,49 @@ Public Sub RunSearch()
     useCamp = campGroup Or (camps.Count > 0) Or (Not useLevel)
     useClient = clientGroup
 
-    ' Typed order = column order for DIMENSIONS too (field request):
-    ' walk the typed order first, then append any enabled dims that were
-    ' implied rather than typed (default view, campaign-name filters)
-    mDimN = 0
+    ' Column layout = EXACT typed order (this is a typed pivot table).
+    ' Implied-but-untyped dimensions (default campaign rows, campaign-name
+    ' filters) go FIRST as traditional label columns; then every typed
+    ' token in the order written; then default metrics when none were typed.
+    mColN = 0
     Dim ord As Variant, tok As Variant
-    ord = Split(Mid$(dimOrder, 2), "|")
+    If useClient And InStr(colOrder, "|client|") = 0 Then
+        mColN = mColN + 1: mColSeq(mColN) = "client"
+    End If
+    If useCamp And InStr(colOrder, "|camp|") = 0 Then
+        mColN = mColN + 1: mColSeq(mColN) = "camp"
+    End If
+    If useLevel And InStr(colOrder, "|level|") = 0 Then
+        mColN = mColN + 1: mColSeq(mColN) = "level"
+    End If
+    ord = Split(Mid$(colOrder, 2), "|")
     For Each tok In ord
-        If CStr(tok) = "client" And useClient Then
-            mDimN = mDimN + 1: mDimSeq(mDimN) = "client"
-        ElseIf CStr(tok) = "camp" And useCamp Then
-            mDimN = mDimN + 1: mDimSeq(mDimN) = "camp"
-        ElseIf CStr(tok) = "level" And useLevel Then
-            mDimN = mDimN + 1: mDimSeq(mDimN) = "level"
+        If CStr(tok) = "client" Then
+            If useClient Then mColN = mColN + 1: mColSeq(mColN) = "client"
+        ElseIf CStr(tok) = "camp" Then
+            If useCamp Then mColN = mColN + 1: mColSeq(mColN) = "camp"
+        ElseIf CStr(tok) = "level" Then
+            If useLevel Then mColN = mColN + 1: mColSeq(mColN) = "level"
+        ElseIf Left$(CStr(tok), 2) = "m:" Then
+            mColN = mColN + 1: mColSeq(mColN) = CStr(tok)
         End If
     Next tok
-    If useClient And InStr(dimOrder, "|client|") = 0 Then
-        mDimN = mDimN + 1: mDimSeq(mDimN) = "client"
+    If Not typedMetrics Then
+        Dim jm As Long
+        For jm = 1 To metricCount
+            mColN = mColN + 1: mColSeq(mColN) = "m:" & metrics(jm)
+        Next jm
     End If
-    If useCamp And InStr(dimOrder, "|camp|") = 0 Then
-        mDimN = mDimN + 1: mDimSeq(mDimN) = "camp"
-    End If
-    If useLevel And InStr(dimOrder, "|level|") = 0 Then
-        mDimN = mDimN + 1: mDimSeq(mDimN) = "level"
-    End If
+
+    ' Dimension subsequence (row-key build order)
+    mDimN = 0
+    Dim ci As Long
+    For ci = 1 To mColN
+        If Left$(mColSeq(ci), 2) <> "m:" Then
+            mDimN = mDimN + 1
+            mDimSeq(mDimN) = mColSeq(ci)
+        End If
+    Next ci
 
     ' ---- Load unified data ----
     Dim data As Variant, lastRow As Long
@@ -265,7 +293,9 @@ Private Sub ParseTerms(raw As String, metrics() As String, metricCount As Long, 
                        levelType As String, levelValues As Object, _
                        camps As Object, campGroup As Boolean, _
                        clientGroup As Boolean, unknownTerms As String, _
-                       ByRef dimOrder As String)
+                       ByRef colOrder As String)
+    ' colOrder records the EXACT typed token order ("m:<name>", "level",
+    ' "camp", "client") — WriteResults renders columns in this order.
     ReDim metrics(1 To 64)
     metricCount = 0
     levelType = ""
@@ -285,10 +315,11 @@ Private Sub ParseTerms(raw As String, metrics() As String, metricCount As Long, 
                     If Not MetricWanted(canonical, metrics, metricCount) Then
                         metricCount = metricCount + 1
                         metrics(metricCount) = canonical
+                        colOrder = colOrder & "m:" & canonical & "|"
                     End If
                 Case "level_type"
                     levelType = canonical
-                    If InStr(dimOrder, "|level|") = 0 Then dimOrder = dimOrder & "level|"
+                    If InStr(colOrder, "|level|") = 0 Then colOrder = colOrder & "level|"
                 Case "level_value"
                     Dim vType As String, ok As Boolean
                     vType = Left$(canonical, InStr(canonical, ":") - 1)
@@ -307,18 +338,18 @@ Private Sub ParseTerms(raw As String, metrics() As String, metricCount As Long, 
                     End If
                     If ok Then
                         levelValues(canonical) = True
-                        If InStr(dimOrder, "|level|") = 0 Then dimOrder = dimOrder & "level|"
+                        If InStr(colOrder, "|level|") = 0 Then colOrder = colOrder & "level|"
                     End If
                 Case "campaign"
                     camps(canonical) = True
                 Case "row_group"
                     If canonical = "campaign" Then
                         campGroup = True
-                        If InStr(dimOrder, "|camp|") = 0 Then dimOrder = dimOrder & "camp|"
+                        If InStr(colOrder, "|camp|") = 0 Then colOrder = colOrder & "camp|"
                     End If
                     If canonical = "client" Then
                         clientGroup = True
-                        If InStr(dimOrder, "|client|") = 0 Then dimOrder = dimOrder & "client|"
+                        If InStr(colOrder, "|client|") = 0 Then colOrder = colOrder & "client|"
                     End If
                 Case Else
                     unknownTerms = AppendTerm(unknownTerms, term)
@@ -455,6 +486,10 @@ Private Sub WriteResults(wsS As Worksheet, rowKeys As Object, sums As Object, _
         counts As Object, metrics() As String, metricCount As Long, _
         levelType As String, useClient As Boolean, useCamp As Boolean, _
         useLevel As Boolean, unknownTerms As String)
+    ' Typed pivot table: ONLY the results table renders (no auto KPI strip —
+    ' it added summary boxes and aggregations the user never asked for),
+    ' and columns follow mColSeq: the exact typed order, dimensions and
+    ' metrics interleaved as written.
     Application.ScreenUpdating = False
     wsS.Range(wsS.Cells(RESULTS_ROW, 2), wsS.Cells(RESULTS_ROW + 5000, 60)).Clear
 
@@ -467,100 +502,28 @@ Private Sub WriteResults(wsS As Worksheet, rowKeys As Object, sums As Object, _
         r = r + 1
     End If
 
-    ' Auto KPI strip: totals of the visible metrics for THIS search
-    If rowKeys.Count > 0 Then
-        Dim kpiShown As Long, km As Long
-        kpiShown = 0
-        For km = 1 To metricCount
-            If kpiShown >= 4 Then Exit For
-            Dim kAgg As String, kTotal As Double, kCnt As Long, kk2 As Variant
-            kAgg = MetricAgg(metrics(km))
-            kTotal = 0#: kCnt = 0
-            For Each kk2 In sums.keys
-                Dim p2() As String
-                p2 = Split(CStr(kk2), Chr$(1))
-                If UBound(p2) >= 1 Then
-                    If StrComp(p2(1), metrics(km), vbTextCompare) = 0 Then
-                        kTotal = kTotal + sums(kk2)
-                        kCnt = kCnt + counts(kk2)
-                    End If
-                End If
-            Next kk2
-            If kAgg = "rate" Then
-                Dim gImp As Double, gNum As Double, kr As Variant
-                gImp = 0#: gNum = 0#
-                For Each kr In sums.keys
-                    Dim p3() As String
-                    p3 = Split(CStr(kr), Chr$(1))
-                    If UBound(p3) >= 1 Then
-                        If p3(1) = Chr$(4) & "IMP" Then gImp = gImp + sums(kr)
-                        If p3(1) = Chr$(4) & "NUM" Then gNum = gNum + sums(kr)
-                    End If
-                Next kr
-                If gImp > 0 Then
-                    kTotal = 100# * gNum / gImp
-                    kCnt = 1
-                End If
-            End If
-            If kCnt > 0 Then
-                If kAgg = "avg" Then kTotal = kTotal / kCnt
-                Dim kc As Long
-                kc = 2 + kpiShown * 2
-                With wsS.Range(wsS.Cells(r, kc), wsS.Cells(r, kc + 1))
-                    .Merge
-                    .Value = Format$(kTotal, IIf(kTotal = Int(kTotal), "#,##0", "#,##0.00"))
-                    .Font.Size = 15
-                    .Font.Bold = True
-                    .Font.Color = RGB(0, 48, 87)
-                    .HorizontalAlignment = xlCenter
-                    .Interior.Color = RGB(238, 242, 247)
-                End With
-                With wsS.Range(wsS.Cells(r + 1, kc), wsS.Cells(r + 1, kc + 1))
-                    .Merge
-                    .Value = UCase$(metrics(km))
-                    .Font.Size = 7
-                    .Font.Bold = True
-                    .Font.Color = RGB(107, 122, 144)
-                    .HorizontalAlignment = xlCenter
-                    .Interior.Color = RGB(238, 242, 247)
-                End With
-                kpiShown = kpiShown + 1
-            End If
-        Next km
-        If kpiShown > 0 Then
-            wsS.Rows(r).RowHeight = 22
-            r = r + 3
+    ' Header in unified column order
+    Dim c As Long, tok As String
+    For c = 1 To mColN
+        tok = mColSeq(c)
+        If tok = "client" Then
+            wsS.Cells(r, 1 + c).Value = "Client"
+        ElseIf tok = "camp" Then
+            wsS.Cells(r, 1 + c).Value = "Campaign"
+        ElseIf tok = "level" Then
+            wsS.Cells(r, 1 + c).Value = _
+                Application.WorksheetFunction.Proper(levelType)
+        Else
+            wsS.Cells(r, 1 + c).Value = Mid$(tok, 3)
         End If
-    End If
-
-    ' Label columns per selected dimension
-    Dim labels() As String, nDims As Long
-    ReDim labels(1 To 3)
-    nDims = 0
-    Dim dj As Long
-    For dj = 1 To mDimN
-        nDims = nDims + 1
-        Select Case mDimSeq(dj)
-            Case "client": labels(nDims) = "Client"
-            Case "camp":   labels(nDims) = "Campaign"
-            Case "level":  labels(nDims) = Application.WorksheetFunction.Proper(levelType)
-        End Select
-    Next dj
-
-    Dim j As Long
-    For j = 1 To nDims
-        wsS.Cells(r, 1 + j).Value = labels(j)
-    Next j
-    For j = 1 To metricCount
-        wsS.Cells(r, 1 + nDims + j).Value = metrics(j)
-    Next j
-    With wsS.Range(wsS.Cells(r, 2), wsS.Cells(r, 1 + nDims + metricCount))
+    Next c
+    With wsS.Range(wsS.Cells(r, 2), wsS.Cells(r, 1 + mColN))
         .Font.Bold = True
         .Font.Color = vbWhite
         .Interior.Color = RGB(0, 48, 87)
     End With
     mResHeaderRow = r
-    mResLastCol = 1 + nDims + metricCount
+    mResLastCol = 1 + mColN
     r = r + 1
 
     Dim n As Long
@@ -577,66 +540,75 @@ Private Sub WriteResults(wsS As Worksheet, rowKeys As Object, sums As Object, _
 
     Dim ki As Long
     For ki = LBound(keys) To UBound(keys)
-        Dim dimParts() As String
+        Dim dimParts() As String, di As Long
         dimParts = Split(CStr(keys(ki)), Chr$(2))
-        For j = 0 To UBound(dimParts)
-            wsS.Cells(r, 2 + j).Value = dimParts(j)
-        Next j
-        For j = 1 To metricCount
-            Dim k As String
-            k = CStr(keys(ki)) & Chr$(1) & metrics(j)
-            If Not sums.Exists(k) Then k = k & Chr$(1)
-            If MetricAgg(metrics(j)) = "rate" Then
-                Dim kImp As String, kNum As String
-                kImp = CStr(keys(ki)) & Chr$(1) & Chr$(4) & "IMP"
-                kNum = CStr(keys(ki)) & Chr$(1) & Chr$(4) & "NUM"
-                If Not sums.Exists(kImp) Then kImp = kImp & Chr$(1)
-                If Not sums.Exists(kNum) Then kNum = kNum & Chr$(1)
-                If sums.Exists(kImp) And sums.Exists(kNum) Then
-                    If sums(kImp) > 0 Then
-                        wsS.Cells(r, 1 + nDims + j).NumberFormat = "0.00""%"""
-                        wsS.Cells(r, 1 + nDims + j).Value = _
-                            100# * sums(kNum) / sums(kImp)
-                        GoTo nextMetric
+        di = 0
+        For c = 1 To mColN
+            tok = mColSeq(c)
+            If Left$(tok, 2) <> "m:" Then
+                If di <= UBound(dimParts) Then
+                    wsS.Cells(r, 1 + c).Value = dimParts(di)
+                End If
+                di = di + 1
+            Else
+                Dim met As String, k As String
+                met = Mid$(tok, 3)
+                k = CStr(keys(ki)) & Chr$(1) & met
+                If Not sums.Exists(k) Then k = k & Chr$(1)
+                If MetricAgg(met) = "rate" Then
+                    Dim kImp As String, kNum As String
+                    kImp = CStr(keys(ki)) & Chr$(1) & Chr$(4) & "IMP"
+                    kNum = CStr(keys(ki)) & Chr$(1) & Chr$(4) & "NUM"
+                    If Not sums.Exists(kImp) Then kImp = kImp & Chr$(1)
+                    If Not sums.Exists(kNum) Then kNum = kNum & Chr$(1)
+                    If sums.Exists(kImp) And sums.Exists(kNum) Then
+                        If sums(kImp) > 0 Then
+                            wsS.Cells(r, 1 + c).NumberFormat = "0.00""%"""
+                            wsS.Cells(r, 1 + c).Value = _
+                                100# * sums(kNum) / sums(kImp)
+                            GoTo nextCol
+                        End If
                     End If
                 End If
-            End If
-            If sums.Exists(k) Then
-                Dim v As Double
-                If MetricAgg(metrics(j)) = "avg" Or MetricAgg(metrics(j)) = "rate" Then
-                    v = sums(k) / counts(k)
-                    wsS.Cells(r, 1 + nDims + j).NumberFormat = "#,##0.00"
-                Else
-                    v = sums(k)
-                    If v = Int(v) Then
-                        wsS.Cells(r, 1 + nDims + j).NumberFormat = "#,##0"
+                If sums.Exists(k) Then
+                    Dim v As Double
+                    If MetricAgg(met) = "avg" Or MetricAgg(met) = "rate" Then
+                        v = sums(k) / counts(k)
+                        wsS.Cells(r, 1 + c).NumberFormat = "#,##0.00"
                     Else
-                        wsS.Cells(r, 1 + nDims + j).NumberFormat = "#,##0.00"
+                        v = sums(k)
+                        If v = Int(v) Then
+                            wsS.Cells(r, 1 + c).NumberFormat = "#,##0"
+                        Else
+                            wsS.Cells(r, 1 + c).NumberFormat = "#,##0.00"
+                        End If
                     End If
+                    wsS.Cells(r, 1 + c).Value = v
                 End If
-                wsS.Cells(r, 1 + nDims + j).Value = v
             End If
-nextMetric:
-        Next j
+nextCol:
+        Next c
         If (r - RESULTS_ROW) Mod 2 = 0 Then
-            wsS.Range(wsS.Cells(r, 2), wsS.Cells(r, 1 + nDims + metricCount)) _
+            wsS.Range(wsS.Cells(r, 2), wsS.Cells(r, 1 + mColN)) _
                .Interior.Color = RGB(238, 242, 247)
         End If
         r = r + 1
     Next ki
     On Error Resume Next
-    wsS.Range(wsS.Cells(mResHeaderRow, 2), wsS.Cells(r, 1 + nDims + metricCount)) _
+    wsS.Range(wsS.Cells(mResHeaderRow, 2), wsS.Cells(r, 1 + mColN)) _
        .Columns.AutoFit
     mResLastRow = r - 1
     If mResLastRow > mResHeaderRow Then
         Dim dcol As Range, db As Object
-        For j = 1 To metricCount
-            Set dcol = wsS.Range(wsS.Cells(mResHeaderRow + 1, 1 + nDims + j), _
-                                 wsS.Cells(mResLastRow, 1 + nDims + j))
-            Set db = dcol.FormatConditions.AddDatabar
-            db.BarColor.Color = RGB(187, 214, 242)
-            db.ShowValue = True
-        Next j
+        For c = 1 To mColN
+            If Left$(mColSeq(c), 2) = "m:" Then
+                Set dcol = wsS.Range(wsS.Cells(mResHeaderRow + 1, 1 + c), _
+                                     wsS.Cells(mResLastRow, 1 + c))
+                Set db = dcol.FormatConditions.AddDatabar
+                db.BarColor.Color = RGB(187, 214, 242)
+                db.ShowValue = True
+            End If
+        Next c
     End If
     On Error GoTo 0
     Application.ScreenUpdating = True

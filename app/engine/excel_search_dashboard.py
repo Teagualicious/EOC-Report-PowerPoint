@@ -16,7 +16,11 @@ Search grammar (mirrored by the VBA in excel_vba.py):
       level TYPE   (e.g. "zip", "network") -> rows become that type's values
       metric       (e.g. "impressions")    -> restrict/order metric columns
       campaign                              -> filter to that campaign
-  - Metric term order = column order. No metric terms -> _Config order.
+  - TYPED PIVOT TABLE contract: result columns follow the EXACT typed
+    order — dimensions and metrics interleaved as written. Untyped implied
+    dimensions (default campaign rows, campaign-name filters) render
+    first; when no metric is typed, the _Config defaults append last.
+  - No auto KPI/summary boxes — only the results table renders.
   - No level terms -> rows are campaigns (totals view).
 """
 
@@ -255,8 +259,8 @@ def build_search_dashboard(wb, df, dictionary=None):
     # Suggestions row (VBA writes clickable chips here)
     ws.row_dimensions[7].height = 8           # air under the inputs
     ws["B8"] = ("Type metrics, levels (zip, network...), values, or "
-                "campaigns — commas separate; metric order = column order. "
-                "Suggestions appear below — click one to add it:")
+                "campaigns — commas separate; columns follow your typed "
+                "order exactly. Suggestions appear below — click one to add it:")
     ws["B8"].font = _hint_font
     ws.row_dimensions[8].height = 14
     ws.row_dimensions[SUGGEST_ROW].height = 18

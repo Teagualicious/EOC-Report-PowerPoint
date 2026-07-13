@@ -159,6 +159,37 @@ class TestWriterRoundTrip:
         assert wb["Unified Data"].max_row == 3
 
 
+class TestVbaContract:
+    """Static checks tying modSearch.bas to the Python-built sheets. The
+    VBA cannot run in CI, but its cell/grammar contract can be locked."""
+
+    @staticmethod
+    def _bas():
+        import os
+        from engine import excel_vba
+        path = os.path.join(os.path.dirname(excel_vba.__file__),
+                            "vba_src", "modSearch.bas")
+        return open(path, encoding="utf-8").read()
+
+    def test_row_constants_match_dashboard(self):
+        from engine.excel_search_dashboard import (RESULTS_START_ROW,
+                                                   SUGGEST_ROW)
+        src = self._bas()
+        assert f"Const RESULTS_ROW As Long = {RESULTS_START_ROW}" in src
+        assert f"Const SUGGEST_ROW As Long = {SUGGEST_ROW}" in src
+
+    def test_typed_pivot_contract(self):
+        """The search renders ONLY the results table, with columns in the
+        exact typed order (mColSeq) — no auto KPI/summary boxes. Locked
+        after real reports showed unrequested aggregate boxes and
+        dims-before-metrics reordering."""
+        src = self._bas()
+        assert "Auto KPI strip" not in src
+        assert "mColSeq" in src
+        assert "exact typed order" in src.lower() or \
+               "EXACT typed order" in src
+
+
 def test_copy_chip_present(df=None):
     import pandas as pd
     from openpyxl import Workbook

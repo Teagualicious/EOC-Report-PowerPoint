@@ -23,7 +23,19 @@
   AI-triggered fill is logged to `fill_history.jsonl` like any other.
 - 11 new tests (workflow service end-to-end, CLI contract incl. JSON
   number types and error envelopes, thin-shell enforcement for CLI/MCP).
-  260 automated tests pass.
+- Excel search is now a strict typed pivot table:
+  - Result columns follow the EXACT typed order — dimensions and metrics
+    interleaved as written ("Impressions, Campaign, Client" renders in
+    that order). Previously dimensions always rendered before metrics.
+  - The auto KPI summary boxes above the results are gone — they added
+    aggregate "cards" (and groupings) the user never asked for. Only the
+    results table renders.
+  - Unrecognized terms still show the "Ignored (no match)" notice; when
+    no metric is typed (or none matches), the default metric set appends
+    AFTER the typed columns instead of reshuffling them.
+  - The VBA/dashboard contract (row constants, typed-order rule, no
+    KPI strip) is now locked by static tests.
+- 262 automated tests pass.
 
 ## July 13, 2026 - Windows debugging batch: wheel/layout fixes, query UX, UI performance
 
