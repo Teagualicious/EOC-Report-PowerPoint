@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "239 passed",
+  "verified_test_result": "244 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -366,19 +366,20 @@
     },
     {
       "path": "app/mapper/query_builder.py",
-      "lines": 443,
+      "lines": 478,
       "public_symbols": [
+        "build_pivot",
         "show_query_builder"
       ],
-      "sha256": "cee33bfb949b0f9e3ceb904411fae4d218593bd850cbfc9a08ba3640674f46f5"
+      "sha256": "853d493e82a1cb1f648103196f3f710101908eddc22f01136be9b0c50194ceb9"
     },
     {
       "path": "app/mapper/sidebar.py",
-      "lines": 224,
+      "lines": 232,
       "public_symbols": [
         "SidebarMixin"
       ],
-      "sha256": "a703dcb41fe8917b9e36b4ff155be12fbe65662945c29130c65b86f1a33c0d88"
+      "sha256": "4d6c4af292fe9106f3c3722680f1da68deca98c6bb7c4017156a0f5712d46cbc"
     },
     {
       "path": "app/mapper/slide_view.py",

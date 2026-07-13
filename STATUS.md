@@ -28,7 +28,8 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - Advanced Query Builder "Apply as ..." always creates a visible sidebar metric (typed name or auto-name), re-armable from Saved Queries; armed selection renders highlighted.
   - Verified review data flags are computed (engine.kpi zero-value + rate-mis-alias heuristics), not hardcoded.
   - Performance: KPI compute moved into the background export pass; review detail rows build lazily on expand; client-wizard search debounced (250 ms); query-builder data scan cached per mapper session.
-  - 239 tests pass (3 new).
+  - Round 2 (Windows re-test feedback): Saved Queries moved directly below Quick Fill; **query pivot correctness fix** — the pivot no longer pools rows across breakdown types (each type re-slices the same delivery, so each type's "Other" bucket summed into a giant bogus top row in shipped tables). Empty breakdown selection now yields the documented campaign-totals table; colliding values across selected types render as disambiguated rows ("Other (zone)"). Pivot extracted to pure `build_pivot()` with regression tests.
+  - 244 tests pass (8 new this phase).
 
 ## Next up
 

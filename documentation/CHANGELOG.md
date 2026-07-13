@@ -31,7 +31,17 @@
 - Confirmed the review screen's data flags are computed from the data
   (zero-value metrics and rate-mis-alias heuristics in engine.kpi), not
   hardcoded.
-- 239 automated tests pass.
+- Query pivot correctness (tables/charts that ship in reports): the pivot
+  no longer pools rows across breakdown types. With no breakdown type
+  selected it now shows the documented clean campaign-totals table —
+  previously every type's rows were pooled and each type's "Other" bucket
+  summed into one giant bogus top row. A value present in more than one
+  selected type is kept as separate disambiguated rows ("Other (zone)",
+  "Other (dow)") instead of being silently summed. The pivot logic moved
+  to a pure `build_pivot()` function locked by regression tests.
+- Saved Queries render directly below Quick Fill in the mapper sidebar
+  instead of after all breakdown sections.
+- 244 automated tests pass.
 
 ## July 13, 2026 - MappingModel extraction (mapper roadmap Phase 3)
 

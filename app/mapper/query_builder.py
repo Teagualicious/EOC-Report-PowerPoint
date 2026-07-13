@@ -24,6 +24,72 @@ def _auto_query_name(query, existing):
     return name
 
 
+def build_pivot(full_df, metric, agg, topn, sel_camps, sel_sources, sel_vals):
+    """Pure pivot computation behind the preview and Table/Chart outputs.
+
+    Returns ``(pivot_df_or_None, note)``. Data-correctness rules — these
+    tables ship in client reports:
+
+    - With NO breakdown type selected, only campaign-total rows are used.
+      Pooling every breakdown type counts the same delivery once per type,
+      which surfaced as a giant bogus "Other" top row.
+    - A level value that exists in more than one selected breakdown type
+      ("Other" appears in zip AND dow AND network) stays as separate
+      disambiguated rows — e.g. "Other (zip)" — instead of being silently
+      summed across types.
+    """
+    df = full_df[full_df["metric"] == metric]
+    if sel_camps:
+        df = df[df["campaign"].isin(sel_camps)]
+    if sel_sources:
+        df = df[df["source"].isin(sel_sources)]
+    else:
+        # "Clean campaign-totals preview" — the documented default for an
+        # empty Breakdown Type selection.
+        df = df[df["source"] == "campaign"]
+    if sel_vals:
+        df = df[(df["level_value"].isin(sel_vals)) | (df["level_value"] == "")]
+
+    if df.empty:
+        return None, "No data matches filters"
+
+    agg_func = {"sum": "sum", "avg": "mean", "max": "max", "min": "min",
+                "count": "count"}.get(agg, "sum")
+
+    note = ""
+    has_levels = bool(df["level_value"].any())
+    if has_levels:
+        level_df = df[df["level_value"] != ""].copy()
+        source_counts = level_df.groupby("level_value")["source"].nunique()
+        ambiguous = set(source_counts[source_counts > 1].index)
+        if ambiguous:
+            mask = level_df["level_value"].isin(ambiguous)
+            level_df.loc[mask, "level_value"] = (
+                level_df.loc[mask, "level_value"] + " ("
+                + level_df.loc[mask, "source"] + ")")
+        pivot = level_df.pivot_table(
+            index="level_value", columns="campaign",
+            values="value", aggfunc=agg_func, fill_value=0)
+        pivot["Total"] = pivot.sum(axis=1)
+        pivot = pivot[pivot["Total"] != 0]   # all-zero rows are noise
+        pivot = pivot.sort_values("Total", ascending=False)
+        if pivot.empty:
+            has_levels = False
+            note = ("  (no " + metric + " at the selected level - "
+                    "showing campaign totals)")
+    if not has_levels:
+        pivot = df.groupby("campaign")["value"].agg(agg_func).reset_index()
+        pivot.columns = ["Campaign", metric]
+        pivot = pivot.sort_values(metric, ascending=False).set_index("Campaign")
+
+    if topn != "all":
+        try:
+            pivot = pivot.head(int(topn))
+        except ValueError:
+            logger.debug("Invalid Top N value: %r", topn)
+    return pivot, note
+
+
 def show_query_builder(wizard):
     """Open the advanced query builder; writes the chosen query/metric back
     onto the wizard (selected_metric, _pending_query, _pending_table_data,
@@ -200,44 +266,13 @@ def show_query_builder(wizard):
         sel_sources = [bd_listbox.get(i) for i in bd_listbox.curselection()]
         sel_vals = [val_listbox.get(i) for i in val_listbox.curselection()]
 
-        df = full_df.copy()
-        df = df[df["metric"] == metric]
-        if sel_camps: df = df[df["campaign"].isin(sel_camps)]
-        if sel_sources: df = df[df["source"].isin(sel_sources)]
-        if sel_vals:
-            df = df[(df["level_value"].isin(sel_vals)) | (df["level_value"] == "")]
-
-        if df.empty:
-            result_label.config(text="No data matches filters")
+        pivot, note = build_pivot(full_df, metric, agg, topn,
+                                  sel_camps, sel_sources, sel_vals)
+        if pivot is None:
+            result_label.config(text=note or "No data matches filters")
             tree.delete(*tree.get_children())
             pivot_result["df"] = None
             return
-
-        agg_func = {"sum": "sum", "avg": "mean", "max": "max", "min": "min", "count": "count"}.get(agg, "sum")
-
-        note = ""
-        has_levels = df["level_value"].any()
-        if has_levels:
-            pivot = df[df["level_value"] != ""].pivot_table(
-                index="level_value", columns="campaign",
-                values="value", aggfunc=agg_func, fill_value=0)
-            pivot["Total"] = pivot.sum(axis=1)
-            pivot = pivot[pivot["Total"] != 0]   # all-zero rows are noise
-            pivot = pivot.sort_values("Total", ascending=False)
-            if pivot.empty:
-                has_levels = False
-                note = ("  (no " + metric + " at the selected level - "
-                        "showing campaign totals)")
-        if not has_levels:
-            pivot = df.groupby("campaign")["value"].agg(agg_func).reset_index()
-            pivot.columns = ["Campaign", metric]
-            pivot = pivot.sort_values(metric, ascending=False).set_index("Campaign")
-
-        if topn != "all":
-            try:
-                pivot = pivot.head(int(topn))
-            except ValueError:
-                logger.debug("Invalid Top N value: %r", topn)
 
         total = pivot["Total"].sum() if "Total" in pivot.columns else pivot.iloc[:, -1].sum()
         vd = f"{total:,.0f}" if isinstance(total, (int, float)) else str(total)

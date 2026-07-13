@@ -24,9 +24,17 @@ class SidebarMixin:
         # Saved/applied queries — rendered like any other metric row. The
         # stored query dict rides along so re-clicking the entry re-arms it
         # for assignment (and re-fills recompute it instead of going stale).
-        for _qn in sorted(getattr(self, 'named_queries', {})):
-            options.append({'category': 'queries', 'label': _qn, 'key': _qn,
-                            'query': self.named_queries[_qn].get('query')})
+        # They slot in directly below the Quick Fill block so fresh applies
+        # are visible without scrolling past every breakdown section.
+        query_opts = [{'category': 'queries', 'label': _qn, 'key': _qn,
+                       'query': self.named_queries[_qn].get('query')}
+                      for _qn in sorted(getattr(self, 'named_queries', {}))]
+        if query_opts:
+            insert_at = 0
+            for _i, _opt in enumerate(options):
+                if _opt['category'] == 'special':
+                    insert_at = _i + 1
+            options[insert_at:insert_at] = query_opts
 
         current_category = ""
         category_labels = {"special": "Quick Fill", "total": "KPI Totals",
