@@ -23,6 +23,11 @@ Before changing application code, read `AI_CONTEXT.md` (design rules, business i
    - Update STATUS.md: what changed, what's next, any decisions made
    - Commit with a clear message
    - Leave the repo in a state a fresh session can pick up with zero conversation context
+5. **Release after a PR.** When a PR's work is complete, create a release for it:
+   - Bump the version (the project's line continues from the inherited v1.22 demo build; bump the minor version for a normal batch of work, e.g. v1.23.0).
+   - Create an annotated git tag on the released commit whose message mirrors the CHANGELOG entry, and push the tag: `git tag -a vX.Y.0 -m "..." && git push origin vX.Y.0`.
+   - Record the version in STATUS.md.
+   - Note: remote Claude Code sessions cannot create GitHub Release pages (no `gh`/API access — tags only); promote the tag to a Release in the GitHub UI if release notes should be user-visible. If the PR is squash-merged, re-tag the merge commit on main so the release stays on the default branch's history.
 
 ## Code style
 
