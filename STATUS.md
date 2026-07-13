@@ -33,6 +33,7 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-13 — Root `requirements.txt` is the dev/CI install and includes `app/requirements.txt` — one source of truth for versions; the Windows launcher keeps installing from `app/requirements.txt` unchanged.
 - 2026-07-13 — Generated PDF guides removed; markdown is canonical — binary docs can't be reviewed in PRs and were already stale.
 - 2026-07-13 — Layout test asserts `PROJECT_ROOT == dirname(APP_DIR)` instead of a hardcoded `IngestionEngine` folder name — the contract is the structure, not the folder's name.
+- 2026-07-13 — Each PR gets a release (CLAUDE.md workflow rule 5): annotated git tag, version continues the inherited line (v1.22 = frozen NYC demo build). This PR released as **v1.23.0**. Remote sessions can only push tags, not create GitHub Release pages — promote in the UI when notes should be user-visible.
 
 ## Noticed (not yet acted on)
 

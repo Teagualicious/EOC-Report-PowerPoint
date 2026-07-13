@@ -1,0 +1,35 @@
+name: Release
+
+# Creates the tag and GitHub Release for a finished PR (CLAUDE.md workflow
+# rule 5). Dispatch it on the released ref with the new version; notes are
+# taken from the top entry of documentation/CHANGELOG.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, e.g. v1.23.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract top CHANGELOG entry
+        run: |
+          awk '/^## /{n++} n==1' documentation/CHANGELOG.md > release_notes.md
+          test -s release_notes.md || echo "See documentation/CHANGELOG.md." > release_notes.md
+
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.version }}" \
+            --target "$GITHUB_SHA" \
+            --title "Ingestion Engine ${{ inputs.version }}" \
+            --notes-file release_notes.md
