@@ -4,9 +4,9 @@
 
 ## Current phase
 
-Phase 2 — Mapper roadmap Phase 3: MappingModel extraction (complete)
+Phase 2 — Mapper roadmap Phase 3: MappingModel extraction (complete, released as v1.24.0)
 
-The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Released: v1.23.0 (repository integration).
+The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
 ## Done
 
@@ -40,6 +40,7 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-13 — Each PR gets a release (CLAUDE.md workflow rule 5), created by the **Release** workflow (`.github/workflows/release.yml`) with the top CHANGELOG entry as notes; version continues the inherited line (v1.22 = frozen NYC demo build). v1.23.0 released this way. Remote sessions cannot push tags or call the release API — the workflow is the supported path.
 - 2026-07-13 — MappingModel keeps the persisted mapping schema byte-compatible (legacy shape-level single assignments included) — old user mappings and `engine.pptx_fill` must keep working without migration.
 - 2026-07-13 — Chart/table live-preview updates stay outside the model — they use transient query-builder data that is not mapping state and re-adding them is not idempotent.
+- 2026-07-13 — v1.24.0 released (PR #5, MappingModel extraction) via the Release workflow.
 
 ## Noticed (not yet acted on)
 
