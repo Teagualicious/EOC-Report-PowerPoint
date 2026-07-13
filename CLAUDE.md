@@ -35,6 +35,7 @@ Before changing application code, read `AI_CONTEXT.md` (design rules, business i
 
 - **GitHub's own merge commits are not yours to fix.** After a PR merges and the working branch is reset onto main, the branch tip is the PR merge commit that GitHub created server-side (committer `GitHub <noreply@github.com>`, GPG-signed with GitHub's web-flow key — it shows as **Verified** on GitHub). The stop hook's commit-signature check can misread it as an unverified local commit and suggest `git commit --amend --reset-author`. **Do not amend or rebase it** — rewriting a commit that already exists on main forks the branch's history. Just fast-forward push the branch (`git push -u origin <branch>`) so local and remote match, and only ever reset-author commits you actually authored in the session.
 - After a PR for the designated branch merges, restart the branch from main (`git fetch origin main && git checkout -B <branch> origin/main`) before follow-up work; merged PRs are never reused.
+- **Verify every merge actually landed.** GitHub has squash-merged a stale PR head twice (PRs #3 and #10): commits pushed to the branch after the PR was opened were silently missing from main, and once a release even shipped without them. After any merge, run `git fetch origin && git diff --stat origin/main origin/<branch>` — an empty diff means main has everything. If commits are missing, rebase them onto main (`git rebase --onto origin/main <last-merged-sha> <branch>`) and ship them as a follow-up PR with a fresh VERSION bump; never assume the merge was complete.
 
 ## Code style
 

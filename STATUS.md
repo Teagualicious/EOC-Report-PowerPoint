@@ -62,6 +62,7 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-13 — v1.24.0 released (PR #5, MappingModel extraction) via the Release workflow.
 - 2026-07-13 — Releases became push-driven: the Release workflow now fires on any push to main that changes the root `VERSION` file (tag + GitHub Release from the CHANGELOG top entry; already-released versions are skipped). Chosen because remote sessions cannot push tags or call the GitHub API when the connector is unavailable — bumping VERSION inside the PR makes merging the release action. Manual dispatch kept as fallback.
 - 2026-07-13 — **v1.25.0 released** (PRs #8/#9, Windows debugging batch + push-driven releases) — first release published by the new VERSION-file trigger, tag on main merge commit 6665fbe.
+- 2026-07-13 — **v1.26.0 released** (PR #10, AI-native interfaces: workflow service + CLI + MCP server). GitHub squash-merged a stale PR head (second occurrence — see CLAUDE.md git notes), so the typed-pivot search fix missed this release and ships as **v1.27.0** immediately after.
 
 ## Noticed (not yet acted on)
 
