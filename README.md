@@ -53,12 +53,13 @@ The default generated reports are written to `output/<client>/`. A different out
 - `documentation/TECHNICAL_GUIDE.md` - data flow, storage, architecture, and integration behavior
 - `documentation/CURRENT_ARCHITECTURE.md` - current module map and dependencies
 - `documentation/API_REFERENCE.md` - important public functions and data contracts
+- `documentation/AI_INTEGRATION.md` - Claude/MCP and terminal automation setup
 - `documentation/TESTING_AND_RELEASE.md` - automated and Windows acceptance testing
 - `documentation/CHANGELOG.md` - current reviewed build changes
 
 ## Current validation status
 
-- 249 automated tests pass (run `pytest` from the repo root).
+- 260 automated tests pass (run `pytest` from the repo root).
 - All Python modules compile.
 - The Tkinter application launches in a graphical smoke test.
 - CSV and Excel large-file performance was improved in the July 10, 2026 review.

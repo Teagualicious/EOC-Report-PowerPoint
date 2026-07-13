@@ -4,7 +4,7 @@
 
 ## Current phase
 
-Phase 3 — Windows debugging batch (complete): wheel/layout fixes, query-builder UX, UI performance
+Phase 4 — AI-native interfaces (complete): headless workflow service + terminal CLI + local MCP server
 
 The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
@@ -31,7 +31,13 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - Round 2 (Windows re-test feedback): Saved Queries moved directly below Quick Fill; **query pivot correctness fix** — the pivot no longer pools rows across breakdown types (each type re-slices the same delivery, so each type's "Other" bucket summed into a giant bogus top row in shipped tables). Empty breakdown selection now yields the documented campaign-totals table; colliding values across selected types render as disambiguated rows ("Other (zone)"). Pivot extracted to pure `build_pivot()` with regression tests.
   - Round 3 (KPI-vs-vendor audit): impressions matched the vendor exactly; three derived metrics explained and addressed. Completion Rate now divides by Video Starts when present (vendor VCR; was impressions-only → 91.98 vs 98.36). Reach/Frequency totals cannot be deduplicated from campaign aggregates (vendor 325,644 vs summed 1,039,763) — relabeled "Combined Reach (not deduplicated)" / "Avg Campaign Frequency" with explanatory data flags; per-campaign values unchanged. Completions ±1 vs vendor traced to best-source picking a breakdown that sums 1 higher than the vendor's own summary (their rounding) — accepted.
   - Round 4 (Excel search regression): root cause was the re-export path editing the existing .xlsm in place with openpyxl, which cannot round-trip macro workbooks (ActiveX search box dropped, sheet/VBA wiring corrupted) — first export worked, every re-export of the same period broke search. `write_to_excel` now harvests existing rows read-only, rebuilds the workbook from scratch, and re-injects the VBA; a stale .xlsm is never left holding old data. Merge semantics unchanged, locked by a lifecycle regression test.
-  - 249 tests pass (13 new this phase).
+  - 249 tests pass (13 new this phase). Released as v1.25.0.
+- Phase 4 (2026-07-13) — AI-native interfaces (Claude Business readiness):
+  - `app/engine/workflow.py` — the full workflow (parse → campaigns → KPIs → export → fill → query) as one headless service; UI, CLI, and MCP server all drive it (thin-shell rule enforced by test).
+  - `app/cli.py` — JSON terminal interface for agents/automation (8 subcommands, `{"ok":…}` envelope, exit codes, no prompts).
+  - `app/mcp_server.py` — local MCP server for Claude Desktop/Code: 8 tools over stdio, data stays on-machine, `INGESTION_MCP_READ_ONLY=1` for analysis-only mode. `mcp` package deliberately NOT in app runtime requirements.
+  - `documentation/AI_INTEGRATION.md` — setup, tool table, example prompts, governance notes.
+  - 260 tests pass (11 new). MCP server tool registration smoke-verified against the real `mcp` package.
 
 ## Next up
 

@@ -1,5 +1,30 @@
 # Changelog
 
+## July 13, 2026 - AI-native interfaces: workflow service, terminal CLI, MCP server
+
+- New `app/engine/workflow.py`: the complete reporting workflow (parse
+  exports → discover campaigns → client dataset → KPIs → Excel workbook →
+  PowerPoint fill → metric queries) as one headless, JSON-friendly service —
+  the same engine code the desktop app runs, now callable without the UI.
+- New `app/cli.py`: terminal interface designed for AI agents and
+  automation. Subcommands `platforms`, `templates`, `scan`, `campaigns`,
+  `kpis`, `export`, `fill`, `query`; every command prints a single JSON
+  object with `ok`/`data`/`error` and a meaningful exit code. No prompts.
+- New `app/mcp_server.py`: local MCP server exposing eight tools
+  (list_platforms, list_templates, scan_export, list_campaigns, get_kpis,
+  query_metric, export_workbook, fill_template) to Claude Desktop / Claude
+  Code over stdio. Campaign data never leaves the machine; the `mcp`
+  package is required only where the server runs (not in the app's runtime
+  requirements). `INGESTION_MCP_READ_ONLY=1` disables the writing tools.
+- New `documentation/AI_INTEGRATION.md`: setup, tool reference, example
+  prompts, and governance notes.
+- Template mapping remains an interactive task; AI interfaces consume
+  saved mappings and keep the usual graceful Office degradation. Every
+  AI-triggered fill is logged to `fill_history.jsonl` like any other.
+- 11 new tests (workflow service end-to-end, CLI contract incl. JSON
+  number types and error envelopes, thin-shell enforcement for CLI/MCP).
+  260 automated tests pass.
+
 ## July 13, 2026 - Windows debugging batch: wheel/layout fixes, query UX, UI performance
 
 - The mouse wheel no longer changes a closed dropdown's value anywhere in
