@@ -1,0 +1,488 @@
+{
+  "project": "Spectrum Reach Reporting Ingestion Engine",
+  "state_date": "2026-07-13",
+  "handoff_build": "repo-integration-fill-tracking",
+  "entrypoint": "app/main.py",
+  "windows_launcher": "Start Ingestion Engine.bat",
+  "python": "3.10+",
+  "supported_inputs": [
+    ".csv",
+    ".xlsx",
+    ".xlsm",
+    ".html",
+    ".htm"
+  ],
+  "unsupported_inputs": {
+    ".xls": "Save as .xlsx before import"
+  },
+  "test_command": "python -m pytest tests -q",
+  "compile_command": "python -m compileall -q app tests",
+  "verified_test_result": "221 passed",
+  "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
+  "directories": {
+    "code": "app/",
+    "resources": "app/resources/",
+    "input_staging": "input/",
+    "default_output": "output/",
+    "application_state": "workspace/",
+    "documentation": "documentation/",
+    "tests": "tests/",
+    "build_and_tools": "developer/"
+  },
+  "critical_docs": [
+    "AI_CONTEXT.md",
+    "documentation/MODEL_HANDOFF.md",
+    "documentation/CURRENT_ARCHITECTURE.md",
+    "documentation/TECHNICAL_GUIDE.md",
+    "documentation/API_REFERENCE.md",
+    "documentation/TESTING_AND_RELEASE.md"
+  ],
+  "requirements": {
+    "beautifulsoup4": "4.15.0",
+    "numpy": "2.5.1",
+    "openpyxl": "3.1.5",
+    "pandas": "3.0.3",
+    "pillow": "12.3.0",
+    "python-pptx": "1.0.2",
+    "pywin32": "312; sys_platform == \"win32\"",
+    "tkcalendar": "1.6.1"
+  },
+  "modules": [
+    {
+      "path": "app/main.py",
+      "lines": 85,
+      "public_symbols": [
+        "main"
+      ],
+      "sha256": "1e0101af71930f314b400996f59f408098351f73979fb2f6e9f7b1d67cc501f6"
+    },
+    {
+      "path": "app/config/__init__.py",
+      "lines": 0,
+      "public_symbols": [],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/config/logging_setup.py",
+      "lines": 40,
+      "public_symbols": [
+        "LOG_FILE",
+        "setup_logging"
+      ],
+      "sha256": "e4940d18ba67f3b4b2c3da73bd50f1e517a78953e76695cf6d35bcd38de72e2c"
+    },
+    {
+      "path": "app/config/naming.py",
+      "lines": 84,
+      "public_symbols": [
+        "safe_component",
+        "storage_key",
+        "safe_child",
+        "unique_component"
+      ],
+      "sha256": "a296b26cc064077b6734f874d9758e3ecc5a7c03d4678035064422f0cd7169c9"
+    },
+    {
+      "path": "app/config/paths.py",
+      "lines": 128,
+      "public_symbols": [
+        "APP_ROOT",
+        "WORKSPACE_DIR",
+        "DICT_PATH",
+        "LOGO_PATH",
+        "SETTINGS_PATH",
+        "MAPPINGS_DIR",
+        "TEMPLATES_DIR",
+        "IMAGES_DIR",
+        "LOGS_DIR",
+        "INPUT_DIR",
+        "OUTPUT_DIR",
+        "migrate_legacy_layout",
+        "ensure_dirs"
+      ],
+      "sha256": "cbcc9208140257cde4e0ebe51a2ff1efd2d4663928a9a43eccc0abd55afde4ae"
+    },
+    {
+      "path": "app/config/settings.py",
+      "lines": 105,
+      "public_symbols": [
+        "DEFAULT_UNCHECKED",
+        "load_settings",
+        "save_settings",
+        "load_platform_config",
+        "save_platform_config",
+        "delete_platform_config"
+      ],
+      "sha256": "9e03f127564b83c8944bd5b75b4e6a3677b8782c3dddc64e6538725ff494a0e2"
+    },
+    {
+      "path": "app/config/themes.py",
+      "lines": 35,
+      "public_symbols": [
+        "THEMES",
+        "get_theme"
+      ],
+      "sha256": "cf89328d0f0dea8fa03d8380f4da094c7686752e3786c49cc02f9da4041424ba"
+    },
+    {
+      "path": "app/engine/__init__.py",
+      "lines": 0,
+      "public_symbols": [],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/engine/data_pipeline.py",
+      "lines": 150,
+      "public_symbols": [
+        "scan_file_structure",
+        "apply_platform_config",
+        "filter_data_by_campaigns"
+      ],
+      "sha256": "9f1afbadec99eb04ef90a785ccec54a1a541d45e25f2ebe6ba7611cbf8bf45f9"
+    },
+    {
+      "path": "app/engine/errors.py",
+      "lines": 19,
+      "public_symbols": [
+        "IngestionError",
+        "ParserError"
+      ],
+      "sha256": "4648e982c6ac2075bb8121ff52053ac5fb553c446c89475a8d962e657e5259fd"
+    },
+    {
+      "path": "app/engine/excel_search_dashboard.py",
+      "lines": 332,
+      "public_symbols": [
+        "NAVY",
+        "BLUE",
+        "LIGHT",
+        "BANNER_TEXT",
+        "HINT_ON_NAVY",
+        "SEARCH_CELL",
+        "BTN_CELL",
+        "DATE_START_CELL",
+        "DATE_END_CELL",
+        "CHIP_START",
+        "CHIP_END",
+        "SUGGEST_ROW",
+        "RESULTS_START_ROW",
+        "COPY_CELL",
+        "build_search_index_rows",
+        "build_config_rows",
+        "build_search_dashboard"
+      ],
+      "sha256": "f29e798dc9d2732ec65e7f1cd8a6b74125e9a3dea91eb13e55e2328d9dfbe338"
+    },
+    {
+      "path": "app/engine/excel_utils.py",
+      "lines": 177,
+      "public_symbols": [
+        "SCHEMA_COLUMNS",
+        "KEY_COLUMNS",
+        "DISPLAY_NAMES",
+        "TOP_N"
+      ],
+      "sha256": "9d34a026cb4121f66d7f420e6cef975e2c2516d2ba9a5f0ccaf86de321eee8e7"
+    },
+    {
+      "path": "app/engine/excel_vba.py",
+      "lines": 354,
+      "public_symbols": [
+        "VBAInjectionError",
+        "VBA_MOD_SEARCH",
+        "VBA_SHEET_SEARCH",
+        "VBA_FORM_CALENDAR",
+        "VBA_CLASS_DAYBTN",
+        "VBA_FORM_CALENDAR_DECLS",
+        "VBA_FORM_CALENDAR_WIRING",
+        "inject_search_vba"
+      ],
+      "sha256": "dfe06baf4117ea982670be590470b8bf1511dcdd3fdc79d6b93fb369ce74a256"
+    },
+    {
+      "path": "app/engine/excel_writer.py",
+      "lines": 172,
+      "public_symbols": [
+        "NAVY",
+        "LIGHT_BLUE",
+        "MED_BLUE",
+        "LIGHT_GRAY",
+        "MED_GRAY",
+        "DARK_TEXT",
+        "MUTED_TEXT",
+        "HEADER_FILL",
+        "HEADER_FONT",
+        "DATA_FONT",
+        "SECTION_FILL",
+        "SECTION_FONT",
+        "CAMPAIGN_HDR_FILL",
+        "CAMPAIGN_HDR_FONT",
+        "TOTAL_FILL",
+        "TOTAL_FONT",
+        "ALT_ROW_FILL",
+        "TITLE_FONT",
+        "SUBTITLE_FONT",
+        "THIN_BORDER",
+        "CR_HEADER_FILL",
+        "CR_TITLE_FONT",
+        "CR_DATE_FONT",
+        "MANAGED_SHEETS",
+        "write_to_excel"
+      ],
+      "sha256": "9edf938928529026f349668d6eeca4f4931709e0b686333f97b365317a98f936"
+    },
+    {
+      "path": "app/engine/fill_report.py",
+      "lines": 146,
+      "public_symbols": [
+        "FILL_HISTORY_NAME",
+        "FillReport",
+        "append_fill_history"
+      ],
+      "sha256": "beef6fedd39a23cb1bf3b49ad695b0fbdddd9c72c7bd26ae1c38d2045c783f55"
+    },
+    {
+      "path": "app/engine/kpi.py",
+      "lines": 121,
+      "public_symbols": [
+        "KPI_METRICS",
+        "KPI_ALIASES",
+        "compute_kpis"
+      ],
+      "sha256": "c746b25a2e135d85f3786cc01503a8918acf9d649df7918ecc6e14dbc55562fd"
+    },
+    {
+      "path": "app/engine/metrics_catalog.py",
+      "lines": 184,
+      "public_symbols": [
+        "SPECIAL_METRICS",
+        "get_available_metrics"
+      ],
+      "sha256": "eadf814d505712967b99d4a5b0f43b4d0076ff2b5ba98b8b328d7ee3feeb1552"
+    },
+    {
+      "path": "app/engine/pptx_fill.py",
+      "lines": 246,
+      "public_symbols": [
+        "fill_template",
+        "fill_template_report"
+      ],
+      "sha256": "924e00ce98e95874942c6c615396a1b89a6d9a27a926205deaed10950a3b285d"
+    },
+    {
+      "path": "app/engine/pptx_formats.py",
+      "lines": 300,
+      "public_symbols": [
+        "DATE_STYLE_CHOICES",
+        "format_date_with_style",
+        "format_with_details"
+      ],
+      "sha256": "281fad300ece14421f6a94bf983beb0061b90cb62141eaa51930f4454ccf4c49"
+    },
+    {
+      "path": "app/engine/pptx_live.py",
+      "lines": 645,
+      "public_symbols": [
+        "PPTXLivePreview"
+      ],
+      "sha256": "90fe6d999ebc1c014f9fffef9f7fae34cd3133d8745564b430c4fb7048d77721"
+    },
+    {
+      "path": "app/engine/pptx_mapper.py",
+      "lines": 214,
+      "public_symbols": [
+        "scan_template",
+        "load_template_mapping",
+        "save_template_mapping",
+        "list_available_templates"
+      ],
+      "sha256": "23b85b6ee1a303a3779e3b12b14d1823ef621ee5f9560567189f7800a894db97"
+    },
+    {
+      "path": "app/engine/pptx_thumbs.py",
+      "lines": 119,
+      "public_symbols": [
+        "THUMBS_DIR",
+        "get_template_thumbnail",
+        "get_template_preview"
+      ],
+      "sha256": "83d80efeb77bfcbc57e68c8fe993908e56871f8afdca3f8240c852c4d6e684da"
+    },
+    {
+      "path": "app/engine/query_resolver.py",
+      "lines": 251,
+      "public_symbols": [
+        "SIMPLE_OPTIONS",
+        "build_simple_options",
+        "resolve_query",
+        "get_available_breakdowns"
+      ],
+      "sha256": "019a1fcb96c1246b1ed50d0f256d61e106800e26ba5d546e28e3b7c32a183f1f"
+    },
+    {
+      "path": "app/engine/template_bundle.py",
+      "lines": 195,
+      "public_symbols": [
+        "FORMAT_NAME",
+        "export_template_bundle",
+        "import_template_bundle"
+      ],
+      "sha256": "66f8d42e46b071ccf6f7c9eebaa2706af1cf9aaf187070153ce10e6110e55b40"
+    },
+    {
+      "path": "app/mapper/__init__.py",
+      "lines": 0,
+      "public_symbols": [],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/mapper/format_popup.py",
+      "lines": 168,
+      "public_symbols": [
+        "show_format_popup"
+      ],
+      "sha256": "ad50a92980d554e41e0a23532332e1e6f8a0f42d4694d555fa7ebceeeb1f0348"
+    },
+    {
+      "path": "app/mapper/mapper_window.py",
+      "lines": 350,
+      "public_symbols": [
+        "PPTXWizard"
+      ],
+      "sha256": "14773140fab7026876278cbf6f49d525a3eeb3de2bbcd45138527154957a8bec"
+    },
+    {
+      "path": "app/mapper/query_builder.py",
+      "lines": 418,
+      "public_symbols": [
+        "show_query_builder"
+      ],
+      "sha256": "59e795c114fcc346b65825b19579444e9127cb8431512ce1c160a6d2d85ba2f8"
+    },
+    {
+      "path": "app/mapper/sidebar.py",
+      "lines": 215,
+      "public_symbols": [
+        "SidebarMixin"
+      ],
+      "sha256": "005799dfd714c33ac6df26a8b62e809d5d218aeae24eb144094c7294afd39ead"
+    },
+    {
+      "path": "app/mapper/slide_view.py",
+      "lines": 454,
+      "public_symbols": [
+        "SlideViewMixin"
+      ],
+      "sha256": "941a99146ceb5263af0e4916d4668e8b7a80194261962ae170ed33dbba914d59"
+    },
+    {
+      "path": "app/parsers/__init__.py",
+      "lines": 0,
+      "public_symbols": [],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/parsers/csv_parser.py",
+      "lines": 173,
+      "public_symbols": [
+        "CSVParser"
+      ],
+      "sha256": "49c6f0389fbba2101d873b598d64058680cd1cd4ad52c024a864b09fc23dd329"
+    },
+    {
+      "path": "app/parsers/dictionary.py",
+      "lines": 212,
+      "public_symbols": [
+        "load_dictionary",
+        "get_metric_aggregation",
+        "match_metric_alias",
+        "match_level",
+        "match_context",
+        "is_skip_column",
+        "classify_columns",
+        "extract_row_context",
+        "build_level_rows",
+        "build_campaign_rows"
+      ],
+      "sha256": "7d5deb8279d711259a91ee376b5a25e35d67a42d4db31744b4135f04b67e2cd4"
+    },
+    {
+      "path": "app/parsers/excel_parser.py",
+      "lines": 248,
+      "public_symbols": [
+        "ExcelParser"
+      ],
+      "sha256": "c1f5f79c04c5dd366ba856368d7ab8bf7a463107ca002b364531cb51a8896aa8"
+    },
+    {
+      "path": "app/parsers/html_parser.py",
+      "lines": 303,
+      "public_symbols": [
+        "FINGERPRINT_DIR",
+        "HTMLParser"
+      ],
+      "sha256": "815c28bc764bccd5cc1bc7d560c02b55df9466af3334021907831615efc5b2b1"
+    },
+    {
+      "path": "app/ui/__init__.py",
+      "lines": 0,
+      "public_symbols": [],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/ui/client_wizard.py",
+      "lines": 291,
+      "public_symbols": [
+        "ClientWizard"
+      ],
+      "sha256": "3afe47febae5c798bb4cb0f3726d386f8937b4c8e747fc1ef4107f282ab91b54"
+    },
+    {
+      "path": "app/ui/main_window.py",
+      "lines": 550,
+      "public_symbols": [
+        "IngestionEngine"
+      ],
+      "sha256": "042a68e718ba8443b18e0a4af2a28fc346af63c26e7945ae12dbf14d9f86e8d0"
+    },
+    {
+      "path": "app/ui/platform_setup.py",
+      "lines": 227,
+      "public_symbols": [
+        "PlatformSetupWindow"
+      ],
+      "sha256": "680dbdf25317faea3b9bcfe0ab8f5b637c2a47e058705329f36e1d685ed4773e"
+    },
+    {
+      "path": "app/ui/review_view.py",
+      "lines": 442,
+      "public_symbols": [
+        "ReviewMixin"
+      ],
+      "sha256": "24d5efac63aa64fb821155a05d0c28c89035c1c66aaada2ff2ffa9aa28089e32"
+    },
+    {
+      "path": "app/ui/settings_window.py",
+      "lines": 502,
+      "public_symbols": [
+        "SettingsWindow"
+      ],
+      "sha256": "967067c53db703ea6f0838b96b59e7045f40291b38144ed8b4ebbae3b19111eb"
+    },
+    {
+      "path": "app/ui/utils.py",
+      "lines": 244,
+      "public_symbols": [
+        "enable_mousewheel",
+        "fit_window",
+        "configure_ttk_styles",
+        "modern_button",
+        "bordered_card",
+        "brand_header",
+        "run_in_background"
+      ],
+      "sha256": "cb9ff0e44ded57f17a6890fc823965bdaa101be14be2ca07166f2dde4a146fa3"
+    }
+  ],
+  "ui_validation": "Corrected from Windows laptop photos; Linux/Xvfb smoke screenshots verified main, settings, platform setup, client assignment, and template selector layouts"
+}

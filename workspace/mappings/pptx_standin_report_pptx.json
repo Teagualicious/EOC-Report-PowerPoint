@@ -1,0 +1,59 @@
+{
+  "slides": {
+    "1": {
+      "shape_mappings": {
+        "3": {
+          "metric": "__client_name__",
+          "format": "text",
+          "replace_text": "CLIENT NAME",
+          "assignments": [],
+          "skip": false
+        },
+        "5": {
+          "metric": "Total Impressions",
+          "format": "number",
+          "replace_text": "",
+          "format_details": {
+            "format": "number",
+            "decimals": 0,
+            "commas": true,
+            "prefix": "",
+            "suffix": ""
+          },
+          "assignments": [],
+          "skip": false
+        },
+        "6": {
+          "metric": "Total Impressions",
+          "format": "currency",
+          "replace_text": "XX",
+          "format_details": {
+            "format": "currency",
+            "decimals": 0,
+            "commas": true,
+            "prefix": "",
+            "suffix": ""
+          },
+          "assignments": [],
+          "skip": false
+        },
+        "9": {
+          "skip": false,
+          "assignments": [
+            {
+              "metric": "__client_name__",
+              "format": "text",
+              "replace_text": "[CLIENT NAME]"
+            },
+            {
+              "metric": "__date_range__",
+              "format": "text",
+              "replace_text": "[XX/XX/XXXX-XX/XX/XXXX]"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "_template_filename": "StandIn_Report.pptx"
+}

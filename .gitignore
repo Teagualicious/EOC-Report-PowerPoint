@@ -1,1 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+/build/
+/dist/
+*.egg-info/
 
+# Portable/vendored dependencies
+app/vendor/
+
+# Application-managed state (created at runtime)
+workspace/settings.json
+workspace/logs/*
+!workspace/logs/.gitkeep
+workspace/templates/images/*
+!workspace/templates/images/.gitkeep
+workspace/templates/thumbs/*
+_preview_*.pptx
+_scan_*.pptx
+
+# User data — never commit real exports or generated reports
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+*.csv
+*.xlsx
+*.xlsm
+!tests/fixtures/*.csv
+
+# Secrets
+.env
+*.pem
+*.key

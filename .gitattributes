@@ -1,0 +1,6 @@
+*.pdf binary
+*.png binary
+*.jpg binary
+*.pptx binary
+*.xlsx binary
+*.bat text eol=crlf

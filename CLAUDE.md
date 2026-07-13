@@ -4,8 +4,9 @@ Instructions for Claude Code sessions in this repository. Read STATUS.md before 
 
 ## Project overview
 
-<!-- EDIT PER PROJECT: one paragraph. What this is, who uses it, what "done" looks like. -->
-(Describe the project here.)
+Spectrum Reach Reporting Ingestion Engine — a local-first Windows desktop app (Tkinter) that converts advertising-platform exports (CSV/XLSX/XLSM/HTML) into searchable Excel workbooks and fills mapped PowerPoint report templates. Application code lives in `app/`, runtime state in `workspace/`; end users launch via `Start Ingestion Engine.bat`.
+
+Before changing application code, read `AI_CONTEXT.md` (design rules, business invariants, pitfalls) and `documentation/MODEL_HANDOFF.md` (authoritative architecture handoff). The Windows-only Office COM paths (Excel VBA injection, PowerPoint live preview) are not exercised by the automated suite — never claim them verified without a Windows/Office acceptance pass.
 
 ## Stack
 
