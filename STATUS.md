@@ -4,32 +4,49 @@
 
 ## Current phase
 
-Phase 0 — Project setup
+Phase 1 — Inherited codebase integration (complete)
+
+The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) now lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code.
 
 ## Done
 
-- Repo cleanup: removed committed `tests/__pycache__`, added root `.gitignore` (Python cache/venv, data files csv/xlsx/pptx except `tests/fixtures/*.csv`, secrets), added `.github/workflows/ci.yml` (pytest on push/PR, Python 3.12).
+- Phase 0 repo cleanup: removed committed `tests/__pycache__`, added `.github/workflows/ci.yml` (pytest on push/PR, Python 3.12). (Root `.gitignore` was actually empty until Phase 1 — see below.)
+- Phase 1 (2026-07-13):
+  - Imported the inherited codebase, restructured to repo standards: tests moved `developer/tests/` → `tests/`, root `requirements.txt` includes `app/requirements.txt` + pytest, pywin32 gained a `sys_platform == "win32"` marker, root `.gitignore` populated (runtime workspace state, input/output data, caches, secrets).
+  - Verified every current doc against the code and fixed stale/wrong content (test counts, paths, layout diagrams; added July 12 fill-report/preview-health coverage; removed false `Workbook_Open` claim; corrected API_REFERENCE signatures). Regenerated `PROJECT_MANIFEST.json`. Removed the generated PDF guides.
+  - Extended the fill-engine golden suite with 7 edge-case characterization tests (image path fallbacks, corrupt-image isolation, image-over-text precedence, date `format_details`, mixed placeholders, no-text-frame no-op).
+  - 221 tests pass; `python -m compileall -q app tests` clean.
 
 ## Next up
 
-1. (first task goes here)
-2.
-3.
+1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl` — per `documentation/TESTING_AND_RELEASE.md` and the drill in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
+2. Mapper roadmap Phase 3 — MappingModel extraction (single pure-Python owner of mapping state; golden suite is the acceptance gate). Agreed to start only after the Windows verification above.
+3. Mapper roadmap Phase 4 — stable shape identity (`shape.Id` with positional fallback); deliberately updates `test_scan_and_fill_agree_on_shape_identity`.
+4. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce, client-wizard drag-select dead code, zoomed-vs-fit_window, all-caps case-forcing decision).
 
 ## Decisions log
 
 <!-- Date — decision — why. Keeps future sessions from re-litigating settled questions. -->
 - YYYY-MM-DD — Repo created from template —
 - 2026-07-12 — CI targets Python 3.12 only — matches current toolchain; matrix can be added later if multi-version support is needed.
+- 2026-07-13 — Inherited app merged at repo root (not a subfolder); tests live in root `tests/` — matches CLAUDE.md standards; `config/paths.py` derives all paths from the app location, so the app is unaffected. Docs updated accordingly.
+- 2026-07-13 — Root `requirements.txt` is the dev/CI install and includes `app/requirements.txt` — one source of truth for versions; the Windows launcher keeps installing from `app/requirements.txt` unchanged.
+- 2026-07-13 — Generated PDF guides removed; markdown is canonical — binary docs can't be reviewed in PRs and were already stale.
+- 2026-07-13 — Layout test asserts `PROJECT_ROOT == dirname(APP_DIR)` instead of a hardcoded `IngestionEngine` folder name — the contract is the structure, not the folder's name.
 
 ## Noticed (not yet acted on)
 
 <!-- Problems spotted mid-task but out of scope. Harvest these periodically. -->
-- (none)
+- Launcher and app docs target Python 3.10+, while repo standard is 3.11+ (CI 3.12). Align when there's a reason to touch the launcher.
+- `AI_CONTEXT.md` §13/§17 still describe delivering a "clean archive" — stale process language now that the project is a git repo with CI.
+- `tests/test_parsers.py::test_real_input_files` scans root `input/` for optional HTML samples — always empty in the repo/CI, so it's effectively a no-op there.
+- Text assignments mapped onto shapes without a text frame are silently unreported by `FillReport` (locked as a characterization test); decide whether to surface it.
+- Two `tests/test_ui_helpers.py` DPI tests import `ui.utils` and therefore need a Python built with tkinter (GitHub Actions setup-python and standard Windows installs have it; minimal Linux builds may not).
 
 ## How to run
 
 ```
 pip install -r requirements.txt
 pytest
+python app/main.py   # launches the Tkinter app (Windows users: Start Ingestion Engine.bat)
 ```
