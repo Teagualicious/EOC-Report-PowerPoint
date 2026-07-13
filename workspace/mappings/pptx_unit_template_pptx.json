@@ -1,0 +1,15 @@
+{
+  "slides": {
+    "1": {
+      "shape_mappings": {
+        "0": {
+          "metric": "__client_name__",
+          "format": "text",
+          "skip": false,
+          "assignments": []
+        }
+      }
+    }
+  },
+  "_template_filename": "unit_template.pptx"
+}

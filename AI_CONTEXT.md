@@ -58,7 +58,7 @@ python -m pytest tests -q
 python -m compileall -q app tests
 ```
 
-Current verified baseline: **249 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
+Current verified baseline: **260 tests pass**. GitHub Actions (`.github/workflows/ci.yml`) runs the suite on every push and pull request (Python 3.12, ubuntu). The Windows launcher still installs from `app/requirements.txt`; the root file includes it and adds pytest.
 
 For Windows releases, also complete the Office acceptance checks in `documentation/TESTING_AND_RELEASE.md`. Linux/macOS test success does not validate Excel VBA injection or PowerPoint COM behavior.
 
@@ -110,6 +110,12 @@ For Windows releases, also complete the Office acceptance checks in `documentati
 - `app/ui/utils.py` — approved shared widgets/styles/background-task helper.
 - `app/mapper/mapping_model.py` — `MappingModel`, the single owner of template-mapping state; all mapper mutations go through it and observers re-render from it.
 - `app/mapper/` — PowerPoint mapper window, sidebar, slide view, format/query dialogs (render and gather input only — mapping mutations belong in the model).
+
+### AI-facing interfaces (headless, no Tk)
+
+- `app/engine/workflow.py` — the shared end-to-end workflow service (parse → campaigns → KPIs → export → fill → query); the UI and both AI interfaces must stay thin over it.
+- `app/cli.py` — JSON-in/JSON-out terminal interface for agents and automation.
+- `app/mcp_server.py` — local MCP server exposing the workflow as Claude tools (`mcp` package required only on the hosting machine; `INGESTION_MCP_READ_ONLY=1` disables the writing tools). See `documentation/AI_INTEGRATION.md`.
 
 ## 5. Non-negotiable business invariants
 

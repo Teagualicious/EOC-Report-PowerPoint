@@ -1,7 +1,7 @@
 {
   "project": "Spectrum Reach Reporting Ingestion Engine",
   "state_date": "2026-07-13",
-  "handoff_build": "ui-debugging-batch",
+  "handoff_build": "ai-native-interfaces",
   "entrypoint": "app/main.py",
   "windows_launcher": "Start Ingestion Engine.bat",
   "python": "3.10+",
@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "249 passed",
+  "verified_test_result": "260 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -49,12 +49,43 @@
   },
   "modules": [
     {
+      "path": "app/cli.py",
+      "lines": 213,
+      "public_symbols": [
+        "cmd_platforms",
+        "cmd_templates",
+        "cmd_scan",
+        "cmd_campaigns",
+        "cmd_kpis",
+        "cmd_export",
+        "cmd_fill",
+        "cmd_query",
+        "build_parser",
+        "main"
+      ],
+      "sha256": "26750b2e5c801057de7a2ab428058d41deeefe3a73847b01ffe75e9f71771b62"
+    },
+    {
       "path": "app/main.py",
       "lines": 85,
       "public_symbols": [
         "main"
       ],
       "sha256": "1e0101af71930f314b400996f59f408098351f73979fb2f6e9f7b1d67cc501f6"
+    },
+    {
+      "path": "app/mcp_server.py",
+      "lines": 159,
+      "public_symbols": [
+        "READ_ONLY",
+        "list_platforms",
+        "list_templates",
+        "scan_export",
+        "list_campaigns",
+        "get_kpis",
+        "query_metric"
+      ],
+      "sha256": "89c710128487f8a8b654022371b2420bde09d167d06e57a8ff5812a6d3a2a4b1"
     },
     {
       "path": "app/config/__init__.py",
@@ -327,6 +358,24 @@
         "import_template_bundle"
       ],
       "sha256": "66f8d42e46b071ccf6f7c9eebaa2706af1cf9aaf187070153ce10e6110e55b40"
+    },
+    {
+      "path": "app/engine/workflow.py",
+      "lines": 241,
+      "public_symbols": [
+        "SUPPORTED_EXTENSIONS",
+        "list_platforms",
+        "list_templates",
+        "scan_export",
+        "parse_files",
+        "list_campaigns",
+        "client_dataset",
+        "kpis_for",
+        "export_workbook",
+        "fill_deck",
+        "query_metric"
+      ],
+      "sha256": "adb1bbf4dbabb1fe7c96b187652f08694eb7ffdf07733ed53aa6b6a489abcc4e"
     },
     {
       "path": "app/mapper/__init__.py",
