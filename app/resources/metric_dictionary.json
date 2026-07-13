@@ -1,0 +1,317 @@
+{
+  "metric_aliases": {
+    "Impressions": [
+      "Impressions",
+      "Imps",
+      "Total Impressions",
+      "Impression Count",
+      "Ad Views"
+    ],
+    "Contributions": [
+      "Contribution",
+      "Contributions",
+      "Completions",
+      "Video Completions"
+    ],
+    "25% Completions": [
+      "25% Complete",
+      "25% Completions",
+      "25 Pct Complete"
+    ],
+    "50% Completions": [
+      "50% Complete",
+      "50% Completions",
+      "50 Pct Complete"
+    ],
+    "75% Completions": [
+      "75% Complete",
+      "75% Completions",
+      "75 Pct Complete"
+    ],
+    "100% Completions": [
+      "100% Complete",
+      "100% Completions",
+      "100 Pct Complete"
+    ],
+    "Clicks": [
+      "Clicks",
+      "Total Clicks",
+      "Ad Clicks"
+    ],
+    "CTR": [
+      "CTR",
+      "Click Through Rate",
+      "Click-Through Rate"
+    ],
+    "Cost": [
+      "Cost",
+      "Spend",
+      "Total Cost",
+      "Budget Spent",
+      "Investment"
+    ],
+    "CPC": [
+      "CPC",
+      "Cost Per Click"
+    ],
+    "CPM": [
+      "CPM",
+      "Cost Per Mille",
+      "Cost Per Thousand"
+    ],
+    "Impression Share": [
+      "Impression Share",
+      "Impr. Share",
+      "IS"
+    ],
+    "Reach": [
+      "Reach",
+      "Unique Reach",
+      "Unique HH",
+      "Unduplicated Reach",
+      "Household Reach"
+    ],
+    "Frequency": [
+      "Frequency",
+      "Avg Frequency",
+      "Avg Freq"
+    ],
+    "Website Visits": [
+      "Website Visits",
+      "Site Visits",
+      "Pixel Visits",
+      "Attributed Visits"
+    ],
+    "Page Views": [
+      "Page Views",
+      "Pageviews",
+      "Pages"
+    ],
+    "Spots": [
+      "Spots",
+      "Spots Aired",
+      "Total Spots",
+      "Units"
+    ],
+    "GRPs": [
+      "GRPs",
+      "Gross Rating Points",
+      "GRP"
+    ],
+    "Completion Rate": [
+      "Completion Rate",
+      "VCR",
+      "Video Completion Rate"
+    ]
+  },
+  "level_definitions": {
+    "device": {
+      "prefix": "device",
+      "id_column_aliases": [
+        "Device",
+        "Device Type",
+        "Device Name",
+        "Platform"
+      ],
+      "description": "Breakdown by device type (Roku, CTV, Mobile, etc.)"
+    },
+    "date": {
+      "prefix": "date",
+      "id_column_aliases": [
+        "Date"
+      ],
+      "description": "Breakdown by date"
+    },
+    "daypart": {
+      "prefix": "daypart",
+      "id_column_aliases": [
+        "Daypart",
+        "Day Part",
+        "DayPart"
+      ],
+      "description": "Breakdown by time of day (Prime, Morning, etc.)"
+    },
+    "hour": {
+      "prefix": "hour",
+      "id_column_aliases": [
+        "Hour",
+        "Hour of Day"
+      ],
+      "description": "Breakdown by hour"
+    },
+    "dow": {
+      "prefix": "dow",
+      "id_column_aliases": [
+        "Day of Week",
+        "Day Of Week",
+        "DOW",
+        "Weekday"
+      ],
+      "description": "Breakdown by day of week"
+    },
+    "zip": {
+      "prefix": "zip",
+      "id_column_aliases": [
+        "Zipcode",
+        "Zip Code",
+        "Zip",
+        "ZIP",
+        "Postal Code",
+        "Zip code"
+      ],
+      "description": "Breakdown by zip code"
+    },
+    "dma": {
+      "prefix": "dma",
+      "id_column_aliases": [
+        "DMA",
+        "DMA Name",
+        "Designated Market Area",
+        "Market"
+      ],
+      "description": "Breakdown by DMA/market"
+    },
+    "audience": {
+      "prefix": "audience",
+      "id_column_aliases": [
+        "Audience Name",
+        "Audience",
+        "Audience Segment"
+      ],
+      "description": "Addressable audience breakdown"
+    },
+    "creative": {
+      "prefix": "creative",
+      "id_column_aliases": [
+        "Creative Name",
+        "Creative",
+        "Ad Creative",
+        "Creative Title"
+      ],
+      "description": "Breakdown by creative/ad unit"
+    },
+    "keyword": {
+      "prefix": "keyword",
+      "id_column_aliases": [
+        "Keyword",
+        "Search Term",
+        "Query",
+        "Search Query"
+      ],
+      "description": "Search keyword breakdown"
+    },
+    "network": {
+      "prefix": "network",
+      "id_column_aliases": [
+        "Network",
+        "Network Name",
+        "Channel"
+      ],
+      "description": "Breakdown by network/channel"
+    }
+  },
+  "context_columns": {
+    "campaign_name": [
+      "Campaign Name",
+      "Campaign",
+      "Order"
+    ]
+  },
+  "skip_columns": [
+    "Order Name",
+    "Order ID",
+    "Flight",
+    "Flight Name",
+    "Start Date",
+    "End Date"
+  ],
+  "date_formats": {
+    "long_ordinal": {
+      "description": "May 1st, 2026",
+      "example": "January 1st, 2026",
+      "regex_patterns": [
+        "(?:Jan(?:uary)?|Feb(?:ruary|uary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}",
+        "\\d{1,2}(?:st|nd|rd|th),?\\s+\\d{4}"
+      ]
+    },
+    "short_month": {
+      "description": "May 1, 2026",
+      "example": "Jan 1, 2026",
+      "regex_patterns": [
+        "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{1,2},?\\s+\\d{4}"
+      ]
+    },
+    "us_slash": {
+      "description": "05/01/2026",
+      "example": "01/01/2026",
+      "regex_patterns": [
+        "\\d{2}/\\d{2}/\\d{4}",
+        "X{2}/X{2}/X{4}"
+      ]
+    },
+    "us_slash_short": {
+      "description": "5/1/2026",
+      "example": "1/1/2026",
+      "regex_patterns": [
+        "\\d{1,2}/\\d{1,2}/\\d{4}",
+        "X{1,2}/X{1,2}/X{4}"
+      ]
+    },
+    "iso": {
+      "description": "2026-05-01",
+      "example": "2026-01-01",
+      "regex_patterns": [
+        "\\d{4}-\\d{2}-\\d{2}"
+      ]
+    },
+    "us_dash": {
+      "description": "05-01-2026",
+      "example": "01-01-2026",
+      "regex_patterns": [
+        "\\d{2}-\\d{2}-\\d{4}"
+      ]
+    },
+    "month_only": {
+      "description": "May",
+      "example": "January",
+      "regex_patterns": [
+        "^\\[?(?:January|February|March|April|May|June|July|August|September|October|November|December)\\]?$",
+        "^\\[MONTH\\]$"
+      ]
+    },
+    "month_year": {
+      "description": "May 2026",
+      "example": "January 2026",
+      "regex_patterns": [
+        "(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{4}",
+        "\\[MONTH/YEAR\\]",
+        "\\[MONTH\\]\\s*\\d{4}"
+      ]
+    },
+    "short_month_year": {
+      "description": "May '26",
+      "example": "Jan 2026",
+      "regex_patterns": [
+        "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{4}",
+        "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+'\\d{2}"
+      ]
+    },
+    "long_mdy": {
+      "description": "Month, Day, Year",
+      "example": "MONTH, DAY, YEAR",
+      "regex_patterns": [
+        "MONTH,?\\s*DAY,?\\s*YEAR",
+        "\\[MONTH,?\\s*DAY,?\\s*YEAR"
+      ]
+    }
+  },
+  "metric_aggregation": {
+    "Frequency": "avg",
+    "CTR": "avg",
+    "CPM": "avg",
+    "CPC": "avg",
+    "Completion Percent": "avg",
+    "Completion Rate": "avg",
+    "Impression Share": "avg"
+  }
+}

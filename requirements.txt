@@ -1,1 +1,5 @@
+# Development/CI requirements. Runtime dependencies live in app/requirements.txt
+# (the Windows launcher installs from there); this file pulls them in so
+# `pip install -r requirements.txt && pytest` works from the repo root.
+-r app/requirements.txt
 pytest>=8.0
