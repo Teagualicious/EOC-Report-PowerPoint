@@ -23,13 +23,13 @@ Before changing application code, read `AI_CONTEXT.md` (design rules, business i
    - Update STATUS.md: what changed, what's next, any decisions made
    - Commit with a clear message
    - Leave the repo in a state a fresh session can pick up with zero conversation context
-5. **Release after a PR.** When a PR's work is complete, create a release for it:
-   - Bump the version (the project's line continues from the inherited v1.22 demo build; bump the minor version for a normal batch of work, e.g. v1.23.0).
+5. **Release after a PR — releases are push-driven.** When a PR's work is complete:
+   - Bump the root `VERSION` file inside the PR (the project's line continues from the inherited v1.22 demo build; bump the minor version for a normal batch of work, e.g. v1.25.0).
    - Make sure the release is covered by the top entry of `documentation/CHANGELOG.md` — the release notes are taken from it.
-   - Run the **Release** workflow (`.github/workflows/release.yml`) on the released ref with the version as input; it creates the tag and the GitHub Release. Remote Claude Code sessions cannot push tags or call the release API directly (the git proxy only allows the designated branch), so the workflow is the supported path.
+   - That's it: merging the PR to main triggers the **Release** workflow (`.github/workflows/release.yml`), which tags the merge commit and publishes the GitHub Release automatically. Remote Claude Code sessions cannot push tags or call the release API (the git proxy only allows the designated branch), so never attempt either — the VERSION bump is the release action.
    - Record the version in STATUS.md's decisions log.
-   - If the PR is squash-merged, release the merge commit on main (not the branch head) so the tag stays on the default branch's history.
-   - Trivial bookkeeping/doc-only PRs (e.g. recording a release in STATUS.md) do not get their own release.
+   - Trivial bookkeeping/doc-only PRs (e.g. recording a release in STATUS.md) do not get their own release — leave VERSION untouched and the workflow won't fire.
+   - Fallback: the workflow still supports manual dispatch (Actions → Release → Run workflow) with an optional version override; it skips versions that already have a release.
 
 ## Git notes for future sessions
 
