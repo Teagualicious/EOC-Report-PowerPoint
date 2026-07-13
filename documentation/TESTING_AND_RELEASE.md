@@ -13,7 +13,7 @@ python -m pytest tests -q
 Expected result for the current build:
 
 ```text
-221 passed
+236 passed
 ```
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same suite on every push and pull request (Python 3.12, Ubuntu).
@@ -35,6 +35,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the same suite on every push an
 - template bundle import/export and malicious archive cases
 - fill report summaries and `fill_history.jsonl` telemetry
 - live-preview COM health tracking and python-pptx fallback
+- mapping-model state ownership (assignment semantics, schema contracts, observers)
 - root input/output layout migration and prior-default settings normalization
 - headless parse-to-export smoke workflows
 

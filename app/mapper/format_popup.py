@@ -152,16 +152,14 @@ def show_format_popup(wizard, event, metric_key, date_only=False):
     update_preview()
 
     def apply():
-        wizard._metric_formats[metric_key] = fmt_var.get()
-        # Store custom format details
-        wizard._metric_format_details = getattr(wizard, '_metric_format_details', {})
-        wizard._metric_format_details[metric_key] = _collect_details()
         win.destroy()
+        # The model stores the preference, pushes the new format into every
+        # existing assignment of this metric, and re-renders the live slide
+        # via the wizard's observer — re-formatting never requires
+        # re-assigning
+        wizard.model.set_metric_format(metric_key, fmt_var.get(),
+                                       _collect_details())
         wizard._refresh_metrics()
-        # Push the new format into existing assignments and re-render the
-        # live slide — re-formatting never requires re-assigning
-        if hasattr(wizard, "_propagate_format_details"):
-            wizard._propagate_format_details(metric_key)
 
     tk.Button(win, text="OK", font=("Calibri", 10, "bold"), bg=t["accent"],
               fg="white", relief="flat", padx=20, pady=5,

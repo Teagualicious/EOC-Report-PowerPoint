@@ -1,5 +1,25 @@
 # Changelog
 
+## July 13, 2026 - MappingModel extraction (mapper roadmap Phase 3)
+
+- Added `app/mapper/mapping_model.py`: `MappingModel` is now the single
+  owner of template-mapping state (assignments, image mappings, skip flags,
+  per-metric format preferences). Every mapper mutation goes through it;
+  the Tk shape panel and the live COM preview are observers that re-render
+  from the model after each change, eliminating the four-way state sync
+  (widgets / shape dicts / COM working copy / JSON).
+- No schema change: the model keeps the exact persisted mapping format,
+  including the legacy shape-level single-assignment form. Old mappings
+  load unchanged and `engine.pptx_fill` is untouched.
+- Assignment semantics preserved verbatim: same-metric re-assign updates in
+  place, a full-text assign onto a mapped shape still asks before replacing,
+  and format changes propagate to existing assignments without re-assigning.
+- 15 new unit tests for the model (schema contracts, assignment semantics,
+  observer events, fill-engine integration); 236 automated tests pass.
+- The mapper's Windows COM live-preview flows still require the acceptance
+  drill in `reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md` before a
+  release build.
+
 ## July 13, 2026 - Repository integration
 
 - Merged the inherited IngestionEngine codebase into the Jughead-Data-Engine

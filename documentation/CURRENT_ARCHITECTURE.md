@@ -97,7 +97,8 @@ developer/
 - `ui.review_view` renders KPI/campaign review and report-generation actions.
 - `ui.settings_window` manages platforms, themes, output, templates, and debug logs.
 - `ui.utils` contains shared modern widgets and thread-to-Tk callbacks.
-- `mapper.mapper_window`, `mapper.sidebar`, `mapper.slide_view`, `mapper.query_builder`, and `mapper.format_popup` implement the template mapper.
+- `mapper.mapping_model` owns all template-mapping state (`MappingModel`); every mapper mutation goes through it and it notifies observers.
+- `mapper.mapper_window`, `mapper.sidebar`, `mapper.slide_view`, `mapper.query_builder`, and `mapper.format_popup` implement the template mapper UI; the shape panel and live COM preview re-render from the model after each change.
 
 ## Dependency direction
 

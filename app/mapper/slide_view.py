@@ -14,30 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 class SlideViewMixin:
-    """Slide rendering and shape-assignment methods for PPTXWizard."""
+    """Slide rendering and shape-assignment methods for PPTXWizard.
 
-    def _propagate_format_details(self, metric_key):
-        """Push new format details into every existing assignment that uses
-        this metric, then re-render the current slide in place. Re-formatting
-        never requires re-assigning (which used to wipe assignment lists)."""
-        details = getattr(self, '_metric_format_details', {}).get(metric_key)
-        if not details:
-            return
-        touched = 0
-        for smap_slides in self.mapping.get("slides", {}).values():
-            for smap in smap_slides.get("shape_mappings", {}).values():
-                targets = smap.get("assignments") or (
-                    [smap] if smap.get("metric") else [])
-                for asgn in targets:
-                    if asgn.get("metric") == metric_key:
-                        asgn["format_details"] = details
-                        asgn["format"] = details.get("format",
-                                                     asgn.get("format", "text"))
-                        touched += 1
-        if touched:
-            logger.info("Format change propagated to %d assignment(s) of %s",
-                        touched, metric_key)
-            self._show_slide()  # re-applies with last_rendered replacement
+    All mapping mutations go through ``self.model`` (MappingModel); the
+    model notifies ``_on_model_change``, which re-renders the current slide
+    — shape panel and live-preview re-apply — from the model's state.
+    """
 
     @staticmethod
     def _display_for(val, fmt, fmt_details, existing_text):
@@ -62,10 +44,11 @@ class SlideViewMixin:
         self.slide_label.config(text=f"Slide {snum}/{len(self.slides)}: {title}")
         self.slide_frame.config(text=f"  Slide {snum}: {title}  ")
 
-        slide_map = self.mapping.get("slides", {}).get(str(snum), {})
-        shape_maps = slide_map.get("shape_mappings", {})
+        shape_maps = self.model.slide_map(snum).get("shape_mappings", {})
 
         # Navigate live preview to this slide and re-apply all assignments
+        # from the model (the preview is an observer — it renders model
+        # state, it is never mutated independently of it)
         if self.live_preview:
             self.live_preview.go_to_slide(snum)
             # Re-apply all existing assignments for this slide
@@ -77,11 +60,10 @@ class SlideViewMixin:
                 if smap.get("image_path"):
                     continue
 
-                # Get all assignments (multi or single)
-                assignments = smap.get("assignments", [])
-                if not assignments and smap.get("metric"):
-                    # Use the mapping dict itself so last_rendered persists
-                    assignments = [smap]
+                # All assignments (multi, or the legacy shape-level single —
+                # the model returns the live stored dicts so last_rendered
+                # bookkeeping persists)
+                assignments = self.model.assignments(snum, s_id)
 
                 existing = self.original_texts.get((snum, int(s_id)), "")
                 for asgn in assignments:
@@ -114,7 +96,7 @@ class SlideViewMixin:
                             expected_name=next(
                                 (sh.get("name") for sh in slide["shapes"]
                                  if str(sh["shape_id"]) == str(s_id)), None))
-                        asgn["last_rendered"] = display
+                        self.model.note_rendered(snum, int(s_id), mk, display)
 
         if not slide["shapes"]:
             tk.Label(self.shapes_frame, text="No shapes with text on this slide",
@@ -216,18 +198,15 @@ class SlideViewMixin:
         self.window.after(200, self._refresh_preview)
 
     def _assign_to_shape(self, shape, text_widget):
+        from mapper.mapping_model import NEEDS_CONFIRM
+
         if not self.selected_metric:
             messagebox.showinfo("Select", "Click a metric in the sidebar first.",
                                 parent=self.window)
             return
 
-        snum_str = str(self.slides[self.current_slide]["slide_num"])
         snum_int = self.slides[self.current_slide]["slide_num"]
         sid = str(shape["shape_id"])
-
-        if "slides" not in self.mapping: self.mapping["slides"] = {}
-        if snum_str not in self.mapping["slides"]:
-            self.mapping["slides"][snum_str] = {"shape_mappings": {}}
 
         # Check for highlighted text (partial replacement)
         replace_text = ""
@@ -242,7 +221,8 @@ class SlideViewMixin:
         metric_fmt = self._metric_formats.get(self.selected_metric, "text")
 
         if (self.selected_metric or "").startswith("__image") and getattr(self, '_pending_image', None):
-            # Copy image to internal templates/images folder
+            # Copy image to internal templates/images folder (file I/O stays
+            # here; only the resulting paths are mapping state)
             os.makedirs(IMAGES_DIR, exist_ok=True)
             img_filename = os.path.basename(self._pending_image)
             internal_img = os.path.join(IMAGES_DIR, img_filename)
@@ -253,150 +233,62 @@ class SlideViewMixin:
                     logger.warning("Could not copy image to internal folder: %s",
                                    self._pending_image, exc_info=True)
 
-            # Store relative path for portability
+            # Relative path for portability; absolute kept for this session
             rel_path = os.path.relpath(internal_img, APP_ROOT)
-
-            self.mapping["slides"][snum_str]["shape_mappings"][sid] = {
-                "metric": "",
-                "image_path": rel_path,
-                "image_path_abs": self._pending_image,  # Keep absolute for current session
-                "skip": False,
-                "assignments": [],
-            }
-            # Live preview: use absolute path for current session
+            self.model.assign_image(snum_int, sid, rel_path, self._pending_image)
+            # Image replacement isn't part of the observer re-apply loop
+            # (re-adding a picture is not idempotent) — do it directly
             if self.live_preview:
                 self.live_preview.replace_shape_with_image(
                     snum_int, int(sid), self._pending_image)
-        else:
-            new_assignment = {
-                "metric": self.selected_metric,
-                "format": metric_fmt,
-                "replace_text": replace_text,
-            }
-            # Detailed format settings (decimals/commas/prefix/suffix) travel
-            # with the assignment so fill paths can apply them
-            fmt_details = getattr(self, '_metric_format_details', {}).get(self.selected_metric)
-            if fmt_details:
-                new_assignment["format_details"] = fmt_details
-            if getattr(self, '_pending_query', None):
-                new_assignment["query"] = self._pending_query
+            return
 
-            # Get or create existing shape mapping
-            existing = self.mapping["slides"][snum_str]["shape_mappings"].get(sid, {})
-            existing_asgns = existing.get("assignments", [])
-            if not existing_asgns and existing.get("metric"):
-                # normalize legacy single-assignment into the list form so
-                # every path below appends/updates instead of overwriting
-                first = {"metric": existing["metric"],
-                         "format": existing.get("format", "text"),
-                         "replace_text": existing.get("replace_text", ""),
-                         "format_details": existing.get("format_details"),
-                         "last_rendered": existing.get("last_rendered")}
-                if existing.get("query"):
-                    first["query"] = existing["query"]
-                existing_asgns = [first]
+        fmt_details = self._metric_format_details.get(self.selected_metric)
+        outcome = self.model.assign_metric(
+            snum_int, sid, self.selected_metric, fmt=metric_fmt,
+            replace_text=replace_text, format_details=fmt_details,
+            query=getattr(self, '_pending_query', None))
 
-            # Same metric already assigned on this shape? Update it in place
-            # (new format/details/query, keep its replace target) instead of
-            # wiping the shape's assignment list.
-            updated_in_place = None
-            for asgn in existing_asgns:
-                if asgn.get("metric") == self.selected_metric:
-                    asgn["format"] = metric_fmt
-                    if fmt_details:
-                        asgn["format_details"] = fmt_details
-                    if getattr(self, '_pending_query', None):
-                        asgn["query"] = self._pending_query
-                    if replace_text:
-                        asgn["replace_text"] = replace_text
-                    updated_in_place = asgn
-                    break
+        if outcome == NEEDS_CONFIRM:
+            # Full replace onto a shape that already has assignments would
+            # previously nuke them all silently — ask first.
+            count = len(self.model.assignments(snum_int, sid))
+            if not messagebox.askyesno(
+                    "Replace assignments?",
+                    f"This shape already has {count} "
+                    f"assignment(s).\n\nAssign without highlighting text "
+                    f"replaces ALL of them with a full-text assignment.\n\n"
+                    f"Replace them?\n(Tip: highlight the text to replace "
+                    f"for a partial assignment instead.)",
+                    parent=self.window):
+                return
+            self.model.assign_metric(
+                snum_int, sid, self.selected_metric, fmt=metric_fmt,
+                replace_text=replace_text, format_details=fmt_details,
+                query=getattr(self, '_pending_query', None),
+                confirm_replace=True)
 
-            _lr_targets = []
-            if updated_in_place is not None:
-                self.mapping["slides"][snum_str]["shape_mappings"][sid] = {
-                    "skip": False, "assignments": existing_asgns}
-                new_assignment = updated_in_place
-                _lr_targets = [updated_in_place]
-            elif existing_asgns and not replace_text:
-                # Full replace onto a shape that already has assignments
-                # would previously nuke them all silently — ask first.
-                if not messagebox.askyesno(
-                        "Replace assignments?",
-                        f"This shape already has {len(existing_asgns)} "
-                        f"assignment(s).\n\nAssign without highlighting text "
-                        f"replaces ALL of them with a full-text assignment.\n\n"
-                        f"Replace them?\n(Tip: highlight the text to replace "
-                        f"for a partial assignment instead.)",
-                        parent=self.window):
-                    return
-                shape_map = dict(new_assignment)
-                shape_map["skip"] = False
-                shape_map["assignments"] = []
-                self.mapping["slides"][snum_str]["shape_mappings"][sid] = shape_map
-                _lr_targets = [new_assignment, shape_map]
-            elif existing_asgns:
-                existing_asgns.append(new_assignment)
-                self.mapping["slides"][snum_str]["shape_mappings"][sid] = {
-                    "skip": False, "assignments": existing_asgns}
-                _lr_targets = [new_assignment]
-            else:
-                # First assignment on this shape
-                shape_map = dict(new_assignment)
-                shape_map["skip"] = False
-                shape_map["assignments"] = []
-                self.mapping["slides"][snum_str]["shape_mappings"][sid] = shape_map
-                _lr_targets = [new_assignment, shape_map]
-
-            # Live preview: update based on output type
-            if self.live_preview:
-                output_type = self._pending_query.get("output", "value") if self._pending_query else "value"
-
-                if output_type == "chart" and getattr(self, '_pending_chart_data', None):
-                    self.live_preview.update_chart_data(
-                        snum_int, int(sid), self._pending_chart_data)
-                    self._pending_chart_data = None  # consume — no stale re-use
-                elif output_type == "table" and getattr(self, '_pending_table_data', None):
-                    self.live_preview.update_table_data(
-                        snum_int, int(sid), self._pending_table_data)
-                    self._pending_table_data = None  # consume — no stale re-use
-                else:
-                    val = self.available_metrics.get(self.selected_metric, "")
-                    existing_text = self.original_texts.get((snum_int, int(sid)), "")
-                    eff_fmt = new_assignment.get("format", metric_fmt)
-                    eff_details = new_assignment.get("format_details") or fmt_details
-                    eff_rt = new_assignment.get("replace_text", "") or replace_text
-                    # Partial replace: detect date style / case from the target
-                    display = self._display_for(val, eff_fmt, eff_details,
-                                                eff_rt or existing_text)
-                    candidates = [c for c in
-                                  [new_assignment.get("last_rendered"), eff_rt]
-                                  if c] or None
-                    self.live_preview.update_shape_text(
-                        snum_int, int(sid), display,
-                        replace_portion=candidates,
-                        expected_name=shape.get("name"))
-                    for tgt in _lr_targets:
-                        tgt["last_rendered"] = display
-
-        self._show_slide()
+        # The model change re-rendered the panel and re-applied text
+        # assignments to the live preview. Chart/table updates use transient
+        # query-builder data that is not mapping state — apply directly.
+        if self.live_preview:
+            output_type = self._pending_query.get("output", "value") if self._pending_query else "value"
+            if output_type == "chart" and getattr(self, '_pending_chart_data', None):
+                self.live_preview.update_chart_data(
+                    snum_int, int(sid), self._pending_chart_data)
+                self._pending_chart_data = None  # consume — no stale re-use
+            elif output_type == "table" and getattr(self, '_pending_table_data', None):
+                self.live_preview.update_table_data(
+                    snum_int, int(sid), self._pending_table_data)
+                self._pending_table_data = None  # consume — no stale re-use
 
     def _toggle_skip(self, shape, skip):
-        snum = str(self.slides[self.current_slide]["slide_num"])
-        sid = str(shape["shape_id"])
-        if "slides" not in self.mapping: self.mapping["slides"] = {}
-        if snum not in self.mapping["slides"]:
-            self.mapping["slides"][snum] = {"shape_mappings": {}}
-        self.mapping["slides"][snum]["shape_mappings"][sid] = {"skip": skip}
-        self._show_slide()
+        self.model.set_skip(self.slides[self.current_slide]["slide_num"],
+                            shape["shape_id"], skip)
 
     def _clear_shape(self, shape):
-        snum_str = str(self.slides[self.current_slide]["slide_num"])
         snum_int = self.slides[self.current_slide]["slide_num"]
         sid = str(shape["shape_id"])
-        sm = self.mapping.get("slides", {}).get(snum_str, {}).get("shape_mappings", {})
-        if sid in sm:
-            del sm[sid]
         # Restore the shape's original text from the pre-modification
         # snapshot (global Undo was unreliable: re-applied assignments pile
         # up COM operations that a single undo cannot unwind).
@@ -404,7 +296,7 @@ class SlideViewMixin:
             restored = self.live_preview.restore_shape_text(snum_int, int(sid))
             if not restored:
                 logger.debug("No snapshot to restore for shape %s", sid)
-        self._show_slide()
+        self.model.clear_shape(snum_int, sid)
 
     def _prev_slide(self):
         if self.current_slide > 0:

@@ -152,6 +152,23 @@ Atomically persists a mapping and records `_template_filename`.
 ### `list_available_templates() -> list[dict]`
 Lists templates and mapping status.
 
+## mapper.mapping_model
+
+### `MappingModel(mapping=None)`
+Single owner of template-mapping state for the mapper. `data` holds the canonical mapping dict in the exact persisted schema (legacy shape-level single assignments included), so `to_dict()` feeds `save_template_mapping()` and `engine.pptx_fill` unchanged.
+
+Reads: `slide_map(slide_num)`, `shape_map(slide_num, shape_id)`, `assignments(slide_num, shape_id)` (normalized list view), `metric_formats` / `metric_format_details` dicts.
+
+Mutations (each notifies subscribers):
+
+- `assign_metric(slide_num, shape_id, metric, fmt="text", replace_text="", format_details=None, query=None, confirm_replace=False)` — returns `CREATED`, `APPENDED`, `UPDATED` (same metric updated in place), `NEEDS_CONFIRM` (full-text assign would replace existing assignments; nothing changed until re-called with `confirm_replace=True`), or `REPLACED`.
+- `assign_image(slide_num, shape_id, image_path, image_path_abs="")`
+- `set_skip(slide_num, shape_id, skip)` — replaces the shape mapping (preserved pre-model behavior: discards assignments).
+- `clear_shape(slide_num, shape_id)`
+- `set_metric_format(metric, fmt, details=None) -> int` — stores per-metric preferences and propagates details into every existing assignment of that metric.
+
+`subscribe(callback)` registers `callback(event, slide_num=None, shape_id=None, metric=None)`; events are `assign`, `image`, `skip`, `clear`, `format`. `note_rendered(slide_num, shape_id, metric, display)` records live-preview bookkeeping without notifying.
+
 ## engine.pptx_fill
 
 ### `fill_template(template_path, output_path, mapping, metric_values) -> str`
