@@ -12,7 +12,10 @@ returned so the UI can tell the user exactly what to enable.
 VBA behavior (mirrors the grammar documented in excel_search_dashboard):
   - Typing in the search cell + Enter, or clicking the Search button chip,
     parses comma-separated terms against _SearchIndex and rebuilds the
-    results table below.
+    results table below. The search is a TYPED PIVOT TABLE: columns render
+    in the exact typed order (dimensions and metrics interleaved). KPI
+    summary cards appear only for explicitly typed metrics when the table
+    has more than one row.
   - Suggestion chips for the last term fragment render in row 7; clicking
     one completes the term and re-runs.
   - Clicking a date 📅 chip opens a small runtime-built calendar UserForm.

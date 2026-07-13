@@ -13,7 +13,7 @@ python -m pytest tests -q
 Expected result for the current build:
 
 ```text
-260 passed
+262 passed
 ```
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same suite on every push and pull request (Python 3.12, Ubuntu).

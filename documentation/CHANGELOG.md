@@ -1,5 +1,23 @@
 # Changelog
 
+## July 13, 2026 - Typed-pivot search contract + gated KPI cards
+
+- The Excel search now behaves as a strict typed pivot table: result
+  columns follow the EXACT typed order — dimensions and metrics
+  interleaved as written ("Impressions, Campaign, Client" renders in that
+  order). Previously dimensions always rendered before metrics.
+- KPI summary cards above the results render only with a reason: for
+  metrics the user explicitly typed (never the auto-filled default set,
+  which produced unrequested boxes and meaningless roll-ups) and only
+  when the table has more than one row (a single row is already its own
+  total). Cards keep typed order and the sum/avg/rate math.
+- Unrecognized terms still show the "Ignored (no match)" notice; when no
+  metric is typed (or none matches), the default metric set appends AFTER
+  the typed columns instead of reshuffling them.
+- The VBA/dashboard contract (row constants, typed-order rule, KPI card
+  gate) is locked by static tests.
+- 262 automated tests pass.
+
 ## July 13, 2026 - AI-native interfaces: workflow service, terminal CLI, MCP server
 
 - New `app/engine/workflow.py`: the complete reporting workflow (parse

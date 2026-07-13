@@ -11,7 +11,7 @@ For AI-assisted work, read root `AI_CONTEXT.md` first, then use this document as
 
 The reviewed and reorganized build is healthy:
 
-- 260 automated tests pass with `python -m pytest tests -q`.
+- 262 automated tests pass with `python -m pytest tests -q`.
 - All Python files compile.
 - The Tkinter application launches successfully in a graphical smoke test.
 - Parsing and Excel generation run in background threads so the UI remains responsive.
@@ -284,7 +284,7 @@ Use `documentation/TESTING_AND_RELEASE.md` before release.
 Before editing:
 
 1. Read this file and `CURRENT_ARCHITECTURE.md`.
-2. Run the 260-test suite.
+2. Run the 262-test suite.
 3. Identify whether the change affects Windows COM, Tkinter threading, metric aggregation, or persisted mappings.
 
 After editing:

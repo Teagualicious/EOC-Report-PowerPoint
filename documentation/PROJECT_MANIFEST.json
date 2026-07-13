@@ -17,7 +17,7 @@
   },
   "test_command": "python -m pytest tests -q",
   "compile_command": "python -m compileall -q app tests",
-  "verified_test_result": "260 passed",
+  "verified_test_result": "262 passed",
   "office_acceptance_status": "Outstanding: run Excel VBA and PowerPoint COM checks on Windows with Office installed",
   "directories": {
     "code": "app/",
@@ -182,7 +182,7 @@
     },
     {
       "path": "app/engine/excel_search_dashboard.py",
-      "lines": 334,
+      "lines": 338,
       "public_symbols": [
         "NAVY",
         "BLUE",
@@ -202,7 +202,7 @@
         "build_config_rows",
         "build_search_dashboard"
       ],
-      "sha256": "900af07675d566674a986d8eb1029aa0b9f75d3b2dbf5367c56350a9e9e5e320"
+      "sha256": "f294330a94c83ff7686ef036b02bdef1299a25a4feed139a9a74143d5fa28e31"
     },
     {
       "path": "app/engine/excel_utils.py",
@@ -217,7 +217,7 @@
     },
     {
       "path": "app/engine/excel_vba.py",
-      "lines": 354,
+      "lines": 356,
       "public_symbols": [
         "VBAInjectionError",
         "VBA_MOD_SEARCH",
@@ -228,7 +228,7 @@
         "VBA_FORM_CALENDAR_WIRING",
         "inject_search_vba"
       ],
-      "sha256": "dfe06baf4117ea982670be590470b8bf1511dcdd3fdc79d6b93fb369ce74a256"
+      "sha256": "887fb1316553bdfec25820e371e42bb8da431deff690f9a392cde97193b6bbaf"
     },
     {
       "path": "app/engine/excel_writer.py",
