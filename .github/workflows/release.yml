@@ -1,15 +1,22 @@
 name: Release
 
 # Creates the tag and GitHub Release for a finished PR (CLAUDE.md workflow
-# rule 5). Dispatch it on the released ref with the new version; notes are
-# taken from the top entry of documentation/CHANGELOG.md.
+# rule 5). Push-driven: bump the VERSION file (plus the CHANGELOG top entry,
+# which becomes the release notes) inside the PR — merging to main publishes
+# the release automatically. Remote Claude Code sessions cannot push tags or
+# call the release API, so no per-release API access is ever needed.
+# Manual dispatch remains as a fallback (version input overrides the file).
+# Already-released versions are skipped, so unrelated pushes are no-ops.
 
 on:
+  push:
+    branches: [main]
+    paths: [VERSION]
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag, e.g. v1.23.0"
-        required: true
+        description: "Release tag override, e.g. v1.25.0 (defaults to the VERSION file)"
+        required: false
 
 permissions:
   contents: write
@@ -20,16 +27,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve version
+        id: v
+        run: |
+          VERSION="${{ inputs.version }}"
+          [ -n "$VERSION" ] || VERSION="$(tr -d ' \r\n' < VERSION)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if already released
+        id: released
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.v.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ steps.v.outputs.version }} already released — nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Extract top CHANGELOG entry
+        if: steps.released.outputs.exists == 'false'
         run: |
           awk '/^## /{n++} n==1' documentation/CHANGELOG.md > release_notes.md
           test -s release_notes.md || echo "See documentation/CHANGELOG.md." > release_notes.md
 
       - name: Create tag and release
+        if: steps.released.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ inputs.version }}" \
+          gh release create "${{ steps.v.outputs.version }}" \
             --target "$GITHUB_SHA" \
-            --title "Ingestion Engine ${{ inputs.version }}" \
+            --title "Ingestion Engine ${{ steps.v.outputs.version }}" \
             --notes-file release_notes.md
