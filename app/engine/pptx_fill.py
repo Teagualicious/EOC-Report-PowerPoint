@@ -7,6 +7,7 @@ from pptx import Presentation
 
 from config.paths import APP_ROOT, WORKSPACE_DIR
 from engine.pptx_formats import _coerce_number, _format_value, format_with_details
+from engine.shape_identity import resolve_shape_index
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +39,36 @@ def fill_template_report(template_path, output_path, mapping, metric_values):
 
         slide = prs.slides[slide_idx]
         shapes = list(slide.shapes)
+        id_name_pairs = []
+        for s in shapes:
+            try:
+                id_name_pairs.append((s.shape_id, s.name))
+            except Exception:
+                id_name_pairs.append((None, getattr(s, "name", "")))
 
         for shape_id_str, smap in slide_mapping.get("shape_mappings", {}).items():
             shape_idx = int(shape_id_str)
-            if shape_idx >= len(shapes):
-                report.note_out_of_range()
-                continue
 
             if smap.get("skip", False):
                 report.note_skip()
                 continue
 
-            shape = shapes[shape_idx]
+            # Prefer the stored persistent identity (uid, then unique name);
+            # legacy entries without one resolve positionally as before.
+            resolved = resolve_shape_index(id_name_pairs, shape_idx,
+                                           smap.get("shape_uid"),
+                                           smap.get("shape_name"))
+            if resolved is None:
+                if smap.get("shape_uid") is not None or smap.get("shape_name"):
+                    # The mapped shape is gone from the template — skipping
+                    # beats writing into whatever sits at the old index.
+                    report.note_missing_shape(
+                        smap.get("shape_name") or f"id {smap.get('shape_uid')}")
+                else:
+                    report.note_out_of_range()
+                continue
+
+            shape = shapes[resolved]
 
             # Image replacement — preserve position and size
             img_path = smap.get("image_path")

@@ -67,13 +67,42 @@ re-render from it. Kills the four-way state sync (widgets / shape dicts /
 COM working copy / JSON). The golden suite is the acceptance gate: all 212
 stay green, UI diffs stay mechanical.
 
-### Phase 4 — Stable shape identity (after Phase 3)
-Key mappings by PowerPoint `shape.Id` (stable) with name fallback, instead
-of positional index. Backward compatible: keep positional keys in the JSON,
-add `shape_uid` alongside; fill prefers uid, falls back to index. Update
-`test_scan_and_fill_agree_on_shape_identity` deliberately; everything else
-must pass unchanged. Removes the "SHAPE INDEX DRIFT" class of wrong-shape
-assignments entirely (pptx_live already warns about drift; this fixes it).
+### Phase 4 — Stable shape identity — DONE 2026-07-14 (needs Windows pass)
+Shipped as designed, with one deliberate policy reading: **stored identity
+that matches nothing → skip + report**, never fall back to the positional
+slot (writing there IS the wrong-shape bug). Legacy entries without stored
+identity still resolve positionally, bit-for-bit as before.
+
+- Scans emit `shape_uid` (python-pptx `shape.shape_id` / COM `Shape.Id`)
+  next to the positional `shape_id`; mapping keys are unchanged.
+- Shared pure resolver `engine/shape_identity.py` (uid → unique name →
+  positional for legacy entries → None), used by `pptx_fill` and a new
+  `PPTXLivePreview._resolve_shape` (fast path: one `Id` read, no
+  enumeration when nothing drifted). COM writes no longer "warn but write
+  anyway" on drift — they retarget by id or skip.
+- `MappingModel.set_scan_identity()` + lazy stamping: mutations stamp
+  `shape_uid`/`shape_name` onto the entries they touch; loading/saving old
+  mappings changes nothing.
+- Fill reports deleted mapped shapes via `FillReport.missing_shapes`
+  (drives the "With Gaps" dialog).
+- Tests: `test_scan_and_fill_agree_on_shape_identity` replaced by
+  reorder/insert/delete drift tests; resolver units in
+  `test_shape_identity.py`; COM `_resolve_shape` stub tests in
+  `test_live_preview_health.py`. Full suite green (279).
+
+**Windows acceptance checklist (pending):**
+1. Full `pytest` pass on Windows.
+2. Id parity: scan one template with `_scan_with_pptx` and `_scan_with_com`;
+   `shape_uid` must match per shape (load-bearing assumption for the live
+   preview; scan+fill are self-consistent either way).
+3. Live drift drill: assign a metric, then in the live PowerPoint window
+   cut the mapped textbox and paste-in-place (or add a shape above it);
+   re-navigate the slide — the value must land on the original shape.
+4. Legacy regression: pre-Phase-4 mapping JSON + unchanged template →
+   identical fill output; mapping file untouched on disk if nothing edited.
+5. Edited-template fill: reorder shapes → values land correctly; delete a
+   mapped shape → "With Gaps" reports it, nothing misfilled.
+6. Image / chart / table live assignments still work (uid kwarg regression).
 
 ### Phase 5 — Small fixes from the July 11 code review
 - Debounce template-preview selection (`after(300)`) + serialize

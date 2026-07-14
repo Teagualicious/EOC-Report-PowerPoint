@@ -219,6 +219,61 @@ def test_failing_observer_does_not_break_mutations(model):
     assert model.shape_map(1, 3)["metric"] == "Impressions"
 
 
+# ── Scan-identity stamping (mapper roadmap Phase 4) ───────────────────────────
+
+SCAN = [{"slide_num": 1, "shapes": [
+    {"shape_id": 0, "shape_uid": 7, "name": "TextBox 3"},
+    {"shape_id": 1, "shape_uid": None, "name": "No-Uid Shape"},
+]}]
+
+
+def test_mutations_stamp_scanned_identity(model):
+    model.set_scan_identity(SCAN)
+
+    model.assign_metric(1, 0, "Impressions", replace_text="[I]")
+    smap = model.shape_map(1, 0)
+    assert smap["shape_uid"] == 7
+    assert smap["shape_name"] == "TextBox 3"
+
+    model.assign_image(1, 0, "rel.png", "/abs.png")
+    smap = model.shape_map(1, 0)
+    assert smap["shape_uid"] == 7 and smap["shape_name"] == "TextBox 3"
+
+    model.set_skip(1, 0, True)  # skip targets a specific shape too
+    assert model.shape_map(1, 0) == {"skip": True, "shape_uid": 7,
+                                     "shape_name": "TextBox 3"}
+
+
+def test_shape_without_uid_stays_unstamped(model):
+    model.set_scan_identity(SCAN)
+    model.assign_metric(1, 1, "Clicks")
+    smap = model.shape_map(1, 1)
+    assert "shape_uid" not in smap and "shape_name" not in smap
+
+
+def test_no_scan_identity_keeps_schema_byte_identical(model):
+    """Callers that never attach a scan (headless flows, every pre-Phase-4
+    code path) must see the exact legacy schema."""
+    model.assign_metric(1, 0, "Impressions")
+    model.set_skip(1, 5, True)
+    assert "shape_uid" not in model.shape_map(1, 0)
+    assert model.shape_map(1, 5) == {"skip": True}
+
+
+def test_legacy_loaded_entry_upgrades_on_touch():
+    """Entries from an old saved mapping gain identity lazily — the first
+    time the user touches them — and never by merely loading/saving."""
+    legacy = {"slides": {"1": {"shape_mappings": {"0": {
+        "metric": "Impressions", "format": "number", "replace_text": "[I]",
+    }}}}}
+    model = MappingModel(legacy)
+    model.set_scan_identity(SCAN)
+    assert "shape_uid" not in model.shape_map(1, 0)  # loading didn't stamp
+
+    model.assign_metric(1, 0, "Impressions", fmt="number")  # touch
+    assert model.shape_map(1, 0)["shape_uid"] == 7
+
+
 # ── Persistence and fill-engine integration ───────────────────────────────────
 
 def test_to_dict_is_json_serializable_and_loads_back(model):

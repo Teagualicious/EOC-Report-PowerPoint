@@ -1,5 +1,28 @@
 # Changelog
 
+## July 14, 2026 - Stable shape identity for the PowerPoint mapper
+
+- Template fills now find each mapped shape by its persistent PowerPoint
+  shape id (with a unique-name fallback) instead of its position in the
+  slide. Editing a mapped template — adding, deleting, or reordering
+  shapes — no longer sends values into the wrong shapes ("SHAPE INDEX
+  DRIFT"), the mapper's flagship correctness bug.
+- Scans emit the id as `shape_uid`; the mapper stamps it (plus the shape
+  name) onto every mapping entry the user touches. Existing saved
+  mappings keep working unchanged and upgrade lazily as they're edited —
+  no migration, and old app versions ignore the new fields.
+- If a mapped shape was deleted from the template, the fill skips it and
+  reports it in the fill summary ("Mapped shapes no longer in the
+  template") instead of silently writing into whatever shape inherited
+  the old position. The live COM preview retargets by id the same way and
+  no longer "warns but writes anyway" on drift.
+- One shared pure resolver (`app/engine/shape_identity.py`) drives both
+  the built-in python-pptx fill and the Windows live preview; drift
+  scenarios (reorder, insert, delete) are locked by end-to-end regression
+  tests. 279 automated tests pass.
+- Needs the Windows/Office acceptance drill (id parity between python-pptx
+  and COM scans, live drift drill) before COM paths are declared verified.
+
 ## July 13, 2026 - Typed-pivot search contract + gated KPI cards
 
 - The Excel search now behaves as a strict typed pivot table: result

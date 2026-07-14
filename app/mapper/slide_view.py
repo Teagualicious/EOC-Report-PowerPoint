@@ -93,9 +93,8 @@ class SlideViewMixin:
                         self.live_preview.update_shape_text(
                             snum, int(s_id), display,
                             replace_portion=candidates,
-                            expected_name=next(
-                                (sh.get("name") for sh in slide["shapes"]
-                                 if str(sh["shape_id"]) == str(s_id)), None))
+                            expected_name=shape.get("name"),
+                            shape_uid=shape.get("shape_uid"))
                         self.model.note_rendered(snum, int(s_id), mk, display)
 
         if not slide["shapes"]:
@@ -240,7 +239,9 @@ class SlideViewMixin:
             # (re-adding a picture is not idempotent) — do it directly
             if self.live_preview:
                 self.live_preview.replace_shape_with_image(
-                    snum_int, int(sid), self._pending_image)
+                    snum_int, int(sid), self._pending_image,
+                    shape_uid=shape.get("shape_uid"),
+                    expected_name=shape.get("name"))
             return
 
         fmt_details = self._metric_format_details.get(self.selected_metric)
@@ -275,11 +276,15 @@ class SlideViewMixin:
             output_type = self._pending_query.get("output", "value") if self._pending_query else "value"
             if output_type == "chart" and getattr(self, '_pending_chart_data', None):
                 self.live_preview.update_chart_data(
-                    snum_int, int(sid), self._pending_chart_data)
+                    snum_int, int(sid), self._pending_chart_data,
+                    shape_uid=shape.get("shape_uid"),
+                    expected_name=shape.get("name"))
                 self._pending_chart_data = None  # consume — no stale re-use
             elif output_type == "table" and getattr(self, '_pending_table_data', None):
                 self.live_preview.update_table_data(
-                    snum_int, int(sid), self._pending_table_data)
+                    snum_int, int(sid), self._pending_table_data,
+                    shape_uid=shape.get("shape_uid"),
+                    expected_name=shape.get("name"))
                 self._pending_table_data = None  # consume — no stale re-use
 
     def _toggle_skip(self, shape, skip):
@@ -293,7 +298,9 @@ class SlideViewMixin:
         # snapshot (global Undo was unreliable: re-applied assignments pile
         # up COM operations that a single undo cannot unwind).
         if self.live_preview and self.live_preview.is_active():
-            restored = self.live_preview.restore_shape_text(snum_int, int(sid))
+            restored = self.live_preview.restore_shape_text(
+                snum_int, int(sid), shape_uid=shape.get("shape_uid"),
+                expected_name=shape.get("name"))
             if not restored:
                 logger.debug("No snapshot to restore for shape %s", sid)
         self.model.clear_shape(snum_int, sid)

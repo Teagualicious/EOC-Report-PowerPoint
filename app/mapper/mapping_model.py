@@ -32,6 +32,7 @@ class MappingModel:
         self.metric_formats = {}         # metric key -> format string
         self.metric_format_details = {}  # metric key -> format-details dict
         self._observers = []
+        self._scan_identity = {}         # (slide_num, shape_id) -> (uid, name)
 
     # ── Observers ─────────────────────────────────────────────────────────
 
@@ -80,6 +81,32 @@ class MappingModel:
         slides = self.data.setdefault("slides", {})
         return slides.setdefault(str(slide_num), {"shape_mappings": {}}) \
                      .setdefault("shape_mappings", {})
+
+    def set_scan_identity(self, slides):
+        """Record each scanned shape's persistent identity (PowerPoint shape
+        id + name, from scan_template's structure) so mutations stamp it
+        onto the entries they touch. Shapes without a ``shape_uid`` stay
+        unstamped — those entries keep resolving positionally, and callers
+        that never attach a scan (headless tests, old flows) see the exact
+        pre-uid schema."""
+        for slide in slides or []:
+            for shape in slide.get("shapes", []):
+                uid = shape.get("shape_uid")
+                if uid is None:
+                    continue
+                key = (str(slide["slide_num"]), str(shape["shape_id"]))
+                self._scan_identity[key] = (uid, shape.get("name", ""))
+
+    def _stamp(self, slide_num, shape_id):
+        """Copy the scanned identity onto the stored entry (no-op when the
+        scan carried none). Legacy entries in a loaded mapping upgrade
+        lazily, the first time the user touches them."""
+        ident = self._scan_identity.get((str(slide_num), str(shape_id)))
+        if not ident:
+            return
+        smap = self._shape_mappings(slide_num).get(str(shape_id))
+        if smap is not None:
+            smap["shape_uid"], smap["shape_name"] = ident
 
     def assign_metric(self, slide_num, shape_id, metric, fmt="text",
                       replace_text="", format_details=None, query=None,
@@ -132,6 +159,7 @@ class MappingModel:
                     asgn["replace_text"] = replace_text
                 shape_mappings[sid] = {"skip": False,
                                        "assignments": existing_asgns}
+                self._stamp(slide_num, sid)
                 self._notify("assign", slide_num, shape_id, metric)
                 return UPDATED
 
@@ -144,6 +172,7 @@ class MappingModel:
             shape_map["skip"] = False
             shape_map["assignments"] = []
             shape_mappings[sid] = shape_map
+            self._stamp(slide_num, sid)
             self._notify("assign", slide_num, shape_id, metric)
             return REPLACED
 
@@ -151,6 +180,7 @@ class MappingModel:
             existing_asgns.append(new_assignment)
             shape_mappings[sid] = {"skip": False,
                                    "assignments": existing_asgns}
+            self._stamp(slide_num, sid)
             self._notify("assign", slide_num, shape_id, metric)
             return APPENDED
 
@@ -159,6 +189,7 @@ class MappingModel:
         shape_map["skip"] = False
         shape_map["assignments"] = []
         shape_mappings[sid] = shape_map
+        self._stamp(slide_num, sid)
         self._notify("assign", slide_num, shape_id, metric)
         return CREATED
 
@@ -171,12 +202,14 @@ class MappingModel:
             "skip": False,
             "assignments": [],
         }
+        self._stamp(slide_num, shape_id)
         self._notify("image", slide_num, shape_id)
 
     def set_skip(self, slide_num, shape_id, skip):
         """Set the skip flag. Note: preserved pre-model behavior — this
         replaces the whole shape mapping, discarding any assignments."""
         self._shape_mappings(slide_num)[str(shape_id)] = {"skip": skip}
+        self._stamp(slide_num, shape_id)
         self._notify("skip", slide_num, shape_id)
 
     def clear_shape(self, slide_num, shape_id):

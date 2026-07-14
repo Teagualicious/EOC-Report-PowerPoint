@@ -74,8 +74,17 @@ def _scan_with_pptx(template_path):
             except Exception:
                 logger.debug("shape_type check failed for %s", shape.name)
 
+            # Persistent PowerPoint shape id — survives reordering/insertion,
+            # unlike the positional shape_id (see engine.shape_identity)
+            try:
+                shape_uid = shape.shape_id
+            except Exception:
+                shape_uid = None
+                logger.debug("shape_id read failed for %s", shape.name)
+
             shape_info = {
                 "name": shape.name, "shape_id": shape_idx,
+                "shape_uid": shape_uid,
                 "has_text": shape.has_text_frame,
                 "has_table": hasattr(shape, "has_table") and shape.has_table,
                 "has_chart": hasattr(shape, "has_chart") and shape.has_chart,
@@ -133,8 +142,14 @@ def _scan_with_com(template_path):
                 is_picture = shape.Type in (13, 11)
             except Exception:
                 logger.debug("COM shape Type check failed")
+            try:
+                shape_uid = shape.Id
+            except Exception:
+                shape_uid = None
+                logger.debug("COM shape Id read failed")
             shape_info = {
                 "name": shape.Name, "shape_id": shi - 1,
+                "shape_uid": shape_uid,
                 "has_text": shape.HasTextFrame, "has_table": shape.HasTable if hasattr(shape, 'HasTable') else False,
                 "has_chart": shape.HasChart if hasattr(shape, 'HasChart') else False,
                 "is_picture": is_picture,

@@ -143,3 +143,55 @@ def test_mapper_fallback_condition_after_disable(preview):
         preview.update_shape_text(1, i, "x")
 
     assert preview.is_active() is False
+
+
+# ── _resolve_shape identity resolution (mapper roadmap Phase 4) ───────────────
+# The COM-side drift logic CI can pin: a fake 1-indexed Shapes collection
+# where the positional slot no longer holds the mapped shape.
+
+def _stub_slide(*id_names):
+    shapes = [type("_Shape", (), {"Id": i, "Name": n})()
+              for i, n in id_names]
+
+    class _Shapes:
+        def __call__(self, n):  # COM collections are 1-indexed
+            return shapes[n - 1]
+
+        @property
+        def Count(self):
+            return len(shapes)
+
+    class _Slide:
+        Shapes = _Shapes()
+
+    return _Slide()
+
+
+def test_resolve_shape_fast_path_when_index_still_matches(preview):
+    slide = _stub_slide((10, "A"), (42, "Target"))
+    shape = preview._resolve_shape(slide, 1, 1, shape_uid=42,
+                                   expected_name="Target")
+    assert shape.Id == 42
+
+
+def test_resolve_shape_retargets_by_uid_after_drift(preview):
+    """The stored index points at the wrong shape — the uid wins."""
+    slide = _stub_slide((10, "A"), (7, "B"), (42, "Target"))
+    shape = preview._resolve_shape(slide, 1, 0, shape_uid=42,
+                                   expected_name="Target")
+    assert shape.Id == 42 and shape.Name == "Target"
+
+
+def test_resolve_shape_legacy_positional_without_uid(preview):
+    """Old mappings carry no uid — positional lookup is unchanged."""
+    slide = _stub_slide((10, "A"), (42, "Target"))
+    shape = preview._resolve_shape(slide, 1, 1)
+    assert shape.Id == 42
+
+
+def test_resolve_shape_unmatched_identity_returns_none(preview):
+    """Mapped shape gone from the deck: never write to the positional
+    slot's new occupant."""
+    slide = _stub_slide((10, "A"), (42, "B"))
+    assert preview._resolve_shape(slide, 1, 0, shape_uid=999,
+                                  expected_name="Gone") is None

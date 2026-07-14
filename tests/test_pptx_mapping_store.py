@@ -151,35 +151,136 @@ def test_scan_reports_shape_types_and_positional_ids(scanned_deck):
     (image,) = by_type["image"]
     assert image["is_picture"] is True
 
-    # shape_id is the positional index fill_template will use — the scan
-    # and the fill MUST agree on identity. (This is the contract the
-    # planned shape.Id refactor changes deliberately.)
+    # shape_id remains the positional index (the mapping-JSON key and what
+    # legacy mappings resolve by); shape_uid is the persistent PowerPoint
+    # id that fills now prefer (engine.shape_identity).
     ids = [s["shape_id"] for s in slide["shapes"]]
     assert ids == sorted(ids)
     assert len(ids) == len(set(ids))
+    uids = [s["shape_uid"] for s in slide["shapes"]]
+    assert all(isinstance(u, int) for u in uids)
+    assert len(uids) == len(set(uids))
 
 
-def test_scan_and_fill_agree_on_shape_identity(tmp_path, scanned_deck):
-    """End-to-end: map a shape by its scanned shape_id, fill by that id,
-    and confirm the value lands in the SAME shape the scan described."""
+def _shape_element(pptx_path, marker):
+    """(presentation, lxml element) of the first shape whose text contains
+    marker — element moves/removals preserve shape ids, exactly like a
+    template edit in PowerPoint."""
+    prs = Presentation(pptx_path)
+    sp = next(s._element for s in prs.slides[0].shapes
+              if s.has_text_frame and marker in s.text_frame.text)
+    return prs, sp
+
+
+def _mapping_with_identity(target, assignments):
+    return {"slides": {"1": {"shape_mappings": {str(target["shape_id"]): {
+        "shape_uid": target["shape_uid"], "shape_name": target["name"],
+        "assignments": assignments}}}}}
+
+
+def test_fill_follows_shape_identity_through_reordering(tmp_path, scanned_deck):
+    """End-to-end drift test: map a shape (with its scanned uid), reorder
+    the template so the positional index goes stale, and confirm the value
+    still lands in the SAME shape. (Deliberately replaces the old
+    positional-identity contract — mapper roadmap Phase 4.)"""
     from engine.pptx_fill import fill_template
     from engine.pptx_mapper import scan_template
 
     slides = scan_template(scanned_deck)
     target = next(s for s in slides[0]["shapes"]
                   if s["text"] == "Impressions: [IMP]")
-    out = str(tmp_path / "out.pptx")
+    old_index = target["shape_id"]
 
+    prs, sp = _shape_element(scanned_deck, "[IMP]")
+    tree = sp.getparent()
+    tree.remove(sp)
+    tree.append(sp)  # move mapped shape to the end of the collection
+    prs.save(scanned_deck)
+
+    moved = next(s for s in scan_template(scanned_deck)[0]["shapes"]
+                 if s["text"] == "Impressions: [IMP]")
+    assert moved["shape_id"] != old_index      # index really drifted
+    assert moved["shape_uid"] == target["shape_uid"]  # uid survived the edit
+
+    out = str(tmp_path / "out.pptx")
     fill_template(scanned_deck, out,
-                  {"slides": {"1": {"shape_mappings": {str(target["shape_id"]): {
-                      "assignments": [{"metric": "Imps", "format": "text",
-                                       "replace_text": "[IMP]"}]}}}}},
+                  _mapping_with_identity(target,
+                      [{"metric": "Imps", "format": "text",
+                        "replace_text": "[IMP]"}]),
                   {"Imps": "1,000,000"})
 
-    prs = Presentation(out)
-    texts = [s.text_frame.text for s in prs.slides[0].shapes
+    texts = [s.text_frame.text for s in Presentation(out).slides[0].shapes
              if s.has_text_frame]
     assert "Impressions: 1,000,000" in texts
+    assert not any("[IMP]" in t for t in texts)
+
+
+def test_fill_survives_inserted_shape(tmp_path, scanned_deck):
+    """A shape inserted before the mapped one shifts every positional index;
+    the stored uid keeps the value on the right shape and the new shape
+    untouched."""
+    from engine.pptx_fill import fill_template_report
+    from engine.pptx_mapper import scan_template
+
+    target = next(s for s in scan_template(scanned_deck)[0]["shapes"]
+                  if s["text"] == "Impressions: [IMP]")
+
+    prs = Presentation(scanned_deck)
+    box = prs.slides[0].shapes.add_textbox(Inches(1), Inches(0.2),
+                                           Inches(2), Inches(0.5))
+    box.text_frame.text = "NEW BANNER"
+    sp = box._element
+    tree = sp.getparent()
+    tree.remove(sp)
+    tree.insert(2, sp)  # spTree slots 0-1 are group properties, not shapes
+    prs.save(scanned_deck)
+
+    out = str(tmp_path / "out.pptx")
+    _, report = fill_template_report(
+        scanned_deck, out,
+        _mapping_with_identity(target,
+            [{"metric": "Imps", "format": "text", "replace_text": "[IMP]"}]),
+        {"Imps": "42"})
+
+    assert report.ok is True
+    texts = [s.text_frame.text for s in Presentation(out).slides[0].shapes
+             if s.has_text_frame]
+    assert "Impressions: 42" in texts
+    assert "NEW BANNER" in texts
+
+
+def test_deleted_mapped_shape_is_reported_not_misfilled(tmp_path, scanned_deck):
+    """Deleting a mapped shape must skip + report — never write into the
+    shape that inherited its positional index."""
+    from engine.pptx_fill import fill_template_report
+    from engine.pptx_mapper import scan_template
+
+    slides = scan_template(scanned_deck)
+    title = next(s for s in slides[0]["shapes"]
+                 if s["text"] == "Monthly Recap")
+    target = next(s for s in slides[0]["shapes"]
+                  if s["text"] == "Impressions: [IMP]")
+
+    prs, sp = _shape_element(scanned_deck, "Monthly Recap")
+    sp.getparent().remove(sp)  # target inherits the title's old index
+    prs.save(scanned_deck)
+
+    mapping = _mapping_with_identity(target,
+        [{"metric": "Imps", "format": "text", "replace_text": "[IMP]"}])
+    mapping["slides"]["1"]["shape_mappings"][str(title["shape_id"])] = {
+        "shape_uid": title["shape_uid"], "shape_name": title["name"],
+        "assignments": [{"metric": "T", "format": "text"}]}
+
+    out = str(tmp_path / "out.pptx")
+    _, report = fill_template_report(scanned_deck, out, mapping,
+                                     {"T": "SHOULD NOT APPEAR", "Imps": "42"})
+
+    assert report.ok is False
+    assert report.missing_shapes == [title["name"]]
+    texts = [s.text_frame.text for s in Presentation(out).slides[0].shapes
+             if s.has_text_frame]
+    assert "Impressions: 42" in texts        # sibling assignment still fills
+    assert "SHOULD NOT APPEAR" not in texts  # nothing misfired
 
 
 def test_scan_unreadable_file_raises_actionable_error(tmp_path):
