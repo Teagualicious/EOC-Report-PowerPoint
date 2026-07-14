@@ -94,6 +94,9 @@ class PPTXWizard(SidebarMixin, SlideViewMixin):
 
         saved = self.load_mapping(os.path.basename(self.template_path))
         if saved: self.model = MappingModel(saved)
+        # Let mutations stamp each entry with the scanned persistent shape
+        # identity (uid + name) so fills survive template edits
+        self.model.set_scan_identity(self.slides)
         self.model.subscribe(self._on_model_change)
 
         # Launch live PowerPoint preview

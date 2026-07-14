@@ -15,6 +15,8 @@ import os
 import shutil
 import tempfile
 
+from engine.shape_identity import resolve_shape_index
+
 logger = logging.getLogger(__name__)
 
 # COM automation — Windows only
@@ -210,6 +212,57 @@ class PPTXLivePreview:
             logger.debug("Paragraph snapshot failed (slide %s, shape %s)",
                          slide_num, shape_index, exc_info=True)
 
+    def _resolve_shape(self, slide, slide_num, shape_index, shape_uid=None,
+                       expected_name=None):
+        """Find the target shape, tolerating index drift.
+
+        Fast path: the shape at the stored index still carries the stored
+        COM Id — no enumeration. On a mismatch the collection is enumerated
+        once and identity resolves uid → unique name → stored index (legacy
+        entries only). Returns None when the shape can't be safely
+        identified — the caller must not write anywhere. Legacy mappings
+        (no uid) keep the historical behavior: positional lookup with a
+        loud warning when the name mismatches.
+        """
+        shape = None
+        if 0 <= shape_index < slide.Shapes.Count:
+            shape = slide.Shapes(shape_index + 1)
+
+        if shape_uid is None:
+            if shape is not None and expected_name:
+                try:
+                    if shape.Name != expected_name:
+                        logger.warning(
+                            "SHAPE INDEX DRIFT: slide %s index %s is now '%s' "
+                            "(expected '%s') — assignment may hit the wrong "
+                            "object", slide_num, shape_index, shape.Name,
+                            expected_name)
+                except Exception:
+                    logger.debug("Name check failed", exc_info=True)
+            return shape
+
+        if shape is not None:
+            try:
+                if shape.Id == shape_uid:
+                    return shape
+            except Exception:
+                logger.debug("Shape Id read failed", exc_info=True)
+
+        pairs = [(slide.Shapes(i).Id, slide.Shapes(i).Name)
+                 for i in range(1, slide.Shapes.Count + 1)]
+        resolved = resolve_shape_index(pairs, shape_index, shape_uid,
+                                       expected_name)
+        if resolved is None:
+            logger.warning(
+                "Mapped shape not found on slide %s (id %s, name %r) — "
+                "skipping instead of writing the wrong shape",
+                slide_num, shape_uid, expected_name)
+            return None
+        logger.warning("Shape index drift on slide %s resolved by identity: "
+                       "stored index %s → live index %s",
+                       slide_num, shape_index, resolved)
+        return slide.Shapes(resolved + 1)
+
     @staticmethod
     def _set_paragraph_text(para, new_text):
         """Replace a paragraph's content WITHOUT touching its paragraph mark.
@@ -234,35 +287,24 @@ class PPTXLivePreview:
 
     @_tracked("update_shape_text")
     def update_shape_text(self, slide_num, shape_index, new_text,
-                          replace_portion=None, expected_name=None):
+                          replace_portion=None, expected_name=None,
+                          shape_uid=None):
         """Update shape text using direct .Text assignment (VBA approach).
 
         Preserves paragraph structure (trailing '\\r' marks) so multi-line
         text boxes keep their per-line formatting. Overflow is handled by
         auto-widen (with shrink-to-fit fallback).
 
-        expected_name, when provided, is checked against the shape actually
-        found at the index — a mismatch means indices drifted (e.g. shapes
-        were added/deleted in PowerPoint) and is logged loudly.
+        shape_uid/expected_name identify the shape when indices drift (see
+        _resolve_shape); an unresolvable shape is skipped, never guessed.
         """
         if not self.is_active():
             return
         try:
             slide = self.presentation.Slides(slide_num)
-            shape = slide.Shapes(shape_index + 1)
-
-            if expected_name:
-                try:
-                    if shape.Name != expected_name:
-                        logger.warning(
-                            "SHAPE INDEX DRIFT: slide %s index %s is now '%s' "
-                            "(expected '%s') — assignment may hit the wrong "
-                            "object", slide_num, shape_index, shape.Name,
-                            expected_name)
-                except Exception:
-                    logger.debug("Name check failed", exc_info=True)
-
-            if not shape.HasTextFrame:
+            shape = self._resolve_shape(slide, slide_num, shape_index,
+                                        shape_uid, expected_name)
+            if shape is None or not shape.HasTextFrame:
                 return
 
             tf = shape.TextFrame
@@ -363,7 +405,8 @@ class PPTXLivePreview:
                 logger.debug("Shrink-to-fit fallback failed", exc_info=True)
 
     @_tracked("restore_shape_text")
-    def restore_shape_text(self, slide_num, shape_index):
+    def restore_shape_text(self, slide_num, shape_index, shape_uid=None,
+                           expected_name=None):
         """Restore a shape's text to its pre-modification snapshot.
 
         Per-paragraph restore preserves each paragraph's own formatting.
@@ -384,8 +427,9 @@ class PPTXLivePreview:
         paras = snap["paras"]
         try:
             slide = self.presentation.Slides(slide_num)
-            shape = slide.Shapes(shape_index + 1)
-            if not shape.HasTextFrame:
+            shape = self._resolve_shape(slide, slide_num, shape_index,
+                                        shape_uid, expected_name)
+            if shape is None or not shape.HasTextFrame:
                 return False
             tf = shape.TextFrame
             count = tf.TextRange.Paragraphs().Count
@@ -413,7 +457,8 @@ class PPTXLivePreview:
             return False
 
     @_tracked("replace_shape_with_image")
-    def replace_shape_with_image(self, slide_num, shape_index, image_path):
+    def replace_shape_with_image(self, slide_num, shape_index, image_path,
+                                 shape_uid=None, expected_name=None):
         """Put an image into a shape WITHOUT disturbing shape indices.
 
         The old delete-then-AddPicture approach appended the new picture at
@@ -430,7 +475,10 @@ class PPTXLivePreview:
             return
         try:
             slide = self.presentation.Slides(slide_num)
-            shape = slide.Shapes(shape_index + 1)
+            shape = self._resolve_shape(slide, slide_num, shape_index,
+                                        shape_uid, expected_name)
+            if shape is None:
+                return
             abs_path = os.path.abspath(image_path)
 
             is_picture = False
@@ -487,7 +535,8 @@ class PPTXLivePreview:
                                  slide_num, shape_index)
 
     @_tracked("update_chart_data")
-    def update_chart_data(self, slide_num, shape_index, data_dict):
+    def update_chart_data(self, slide_num, shape_index, data_dict,
+                          shape_uid=None, expected_name=None):
         """Update an existing chart's data via COM.
 
         Args:
@@ -500,7 +549,10 @@ class PPTXLivePreview:
             return
         try:
             slide = self.presentation.Slides(slide_num)
-            shape = slide.Shapes(shape_index + 1)
+            shape = self._resolve_shape(slide, slide_num, shape_index,
+                                        shape_uid, expected_name)
+            if shape is None:
+                return
 
             if not shape.HasChart:
                 logger.warning("Shape %s on slide %s is not a chart",
@@ -543,7 +595,8 @@ class PPTXLivePreview:
                                  slide_num, shape_index)
 
     @_tracked("update_table_data")
-    def update_table_data(self, slide_num, shape_index, data_dict):
+    def update_table_data(self, slide_num, shape_index, data_dict,
+                          shape_uid=None, expected_name=None):
         """Update an existing PowerPoint table shape via COM.
 
         Args:
@@ -556,7 +609,10 @@ class PPTXLivePreview:
             return
         try:
             slide = self.presentation.Slides(slide_num)
-            shape = slide.Shapes(shape_index + 1)
+            shape = self._resolve_shape(slide, slide_num, shape_index,
+                                        shape_uid, expected_name)
+            if shape is None:
+                return
 
             if not shape.HasTable:
                 logger.warning("Shape %s on slide %s is not a table",

@@ -4,7 +4,7 @@
 
 ## Current phase
 
-Phase 4 — AI-native interfaces (complete): headless workflow service + terminal CLI + local MCP server
+Phase 5 — Mapper roadmap Phase 4, stable shape identity (complete; Windows drift drill pending)
 
 The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
@@ -40,12 +40,17 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - 260 tests pass (11 new). MCP server tool registration smoke-verified against the real `mcp` package.
   - Round 2 (search pivot contract): the Excel search now behaves as a strict typed pivot table — columns render in the exact typed order (dims and metrics interleaved; implied dims first, default metrics appended last). KPI summary cards kept but gated (user request): they render only for explicitly typed metrics and only when the table has >1 row — never for the auto-filled default set that produced unrequested boxes/roll-ups. modSearch.bas WriteResults/ParseTerms rewritten around a unified column sequence (mColSeq); grammar docs and Search-sheet hint updated; VBA/dashboard contract locked by static tests. **Needs the Windows search drill re-run** (typed-order searches, e.g. "Impressions, Campaign, Client" and "Client, Campaign, Zip Code"; KPI cards only in the first case).
   - 262 tests pass (13 new this phase).
+- Phase 5 (2026-07-14) — Mapper roadmap Phase 4, stable shape identity:
+  - Fills resolve each mapped shape by persistent PowerPoint id (`shape_uid`, python-pptx `shape.shape_id` / COM `Shape.Id`) with unique-name fallback; positional index only for legacy entries without stored identity. Kills the SHAPE INDEX DRIFT wrong-shape bug class when templates are edited.
+  - Scans (`pptx_mapper`, both scanners) emit `shape_uid` alongside the positional `shape_id` (mapping-JSON keys unchanged). `MappingModel.set_scan_identity()` + lazy stamping put `shape_uid`/`shape_name` on entries as the user touches them; loading/saving old mappings changes nothing (schema byte-identical without a scan attached).
+  - Shared pure resolver `app/engine/shape_identity.py` used by `pptx_fill` and new `PPTXLivePreview._resolve_shape` (fast path = one COM Id read; drift retargets by id or skips — no more "warn but write anyway"). Deleted mapped shapes surface via `FillReport.missing_shapes` in the With-Gaps dialog.
+  - Tests: `test_scan_and_fill_agree_on_shape_identity` deliberately replaced by reorder/insert/delete drift e2e tests; resolver units (`test_shape_identity.py`); COM stub tests; model stamping tests. 279 pass (17 new); all pre-Phase-4 tests pass unchanged (backward-compat gate).
+  - Prompted by the question "would pptxgenjs fix the mapper?" — answered in the plan: pptxgenjs is generation-only (cannot open/edit existing templates) and addresses none of the real issue classes; this refactor is the actual fix.
 
 ## Next up
 
-1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, and now the refactored mapper (assign/skip/clear/format flows with live preview running) — per `documentation/TESTING_AND_RELEASE.md` and the drill in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
-2. Mapper roadmap Phase 4 — stable shape identity (`shape.Id` with positional fallback); deliberately updates `test_scan_and_fill_agree_on_shape_identity`; everything else must pass unchanged.
-3. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce, client-wizard drag-select dead code, zoomed-vs-fit_window, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
+1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, the refactored mapper, and now the Phase-4 drift drill (id parity between python-pptx/COM scans, live cut-paste retargeting, legacy-mapping regression) — per `documentation/TESTING_AND_RELEASE.md` and the checklist in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
+2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce, client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
 
 ## Decisions log
 
@@ -63,6 +68,10 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-13 — Releases became push-driven: the Release workflow now fires on any push to main that changes the root `VERSION` file (tag + GitHub Release from the CHANGELOG top entry; already-released versions are skipped). Chosen because remote sessions cannot push tags or call the GitHub API when the connector is unavailable — bumping VERSION inside the PR makes merging the release action. Manual dispatch kept as fallback.
 - 2026-07-13 — **v1.25.0 released** (PRs #8/#9, Windows debugging batch + push-driven releases) — first release published by the new VERSION-file trigger, tag on main merge commit 6665fbe.
 - 2026-07-13 — **v1.26.0 released** (PR #10, AI-native interfaces: workflow service + CLI + MCP server). GitHub squash-merged a stale PR head (second occurrence — see CLAUDE.md git notes), so the typed-pivot search fix missed this release and ships as **v1.27.0** immediately after.
+- 2026-07-13 — **v1.27.0 released** (PR #11, typed-pivot search contract + gated KPI cards).
+- 2026-07-14 — pptxgenjs rejected as a mapper replacement — it only generates new decks (no API to open/edit existing .pptx), while the mapper's job is filling existing client templates; the real fix for wrong-shape assignments is stable shape identity (mapper roadmap Phase 4), implemented instead.
+- 2026-07-14 — Mapping entries with stored identity that matches nothing in the deck are **skipped and reported** (`FillReport.missing_shapes`), never resolved positionally — writing into the positional slot's new occupant IS the wrong-shape bug. Legacy entries without stored identity keep positional resolution bit-for-bit. Duplicate shape names never match (no guessing).
+- 2026-07-14 — **v1.28.0** — stable shape identity (mapper roadmap Phase 4); releases on merge via the VERSION-file workflow.
 
 ## Noticed (not yet acted on)
 

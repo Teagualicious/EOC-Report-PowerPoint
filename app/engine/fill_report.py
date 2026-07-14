@@ -30,6 +30,7 @@ class FillReport:
         self.skipped = 0                 # shapes explicitly marked skip
         self.out_of_range = 0            # slide/shape indices past the deck
         self.missing_metrics = []        # metric names not in this export
+        self.missing_shapes = []         # mapped shapes no longer in the deck
         self.unmatched_placeholders = [] # (metric, replace_text) never found
         self.missing_images = []         # image paths that didn't resolve
         self.failed_queries = []         # query-backed metrics that errored
@@ -52,6 +53,9 @@ class FillReport:
     def note_missing_metric(self, name):
         if name and name not in self.missing_metrics:
             self.missing_metrics.append(name)
+
+    def note_missing_shape(self, desc):
+        self.missing_shapes.append(str(desc))
 
     def note_unmatched_placeholder(self, metric, replace_text):
         self.unmatched_placeholders.append(
@@ -77,7 +81,8 @@ class FillReport:
     @property
     def ok(self):
         """True when nothing the user mapped was left unfilled."""
-        return not (self.missing_metrics or self.unmatched_placeholders
+        return not (self.missing_metrics or self.missing_shapes
+                    or self.unmatched_placeholders
                     or self.missing_images or self.failed_queries
                     or self.errors)
 
@@ -91,6 +96,9 @@ class FillReport:
         if self.missing_metrics:
             problems.append("Metrics not in this export: "
                             + ", ".join(self.missing_metrics))
+        if self.missing_shapes:
+            problems.append("Mapped shapes no longer in the template: "
+                            + ", ".join(self.missing_shapes))
         if self.unmatched_placeholders:
             ph = ", ".join(p["placeholder"] or p["metric"]
                            for p in self.unmatched_placeholders)
@@ -121,6 +129,7 @@ class FillReport:
             "skipped": self.skipped,
             "out_of_range": self.out_of_range,
             "missing_metrics": list(self.missing_metrics),
+            "missing_shapes": list(self.missing_shapes),
             "unmatched_placeholders": list(self.unmatched_placeholders),
             "missing_images": list(self.missing_images),
             "failed_queries": list(self.failed_queries),
