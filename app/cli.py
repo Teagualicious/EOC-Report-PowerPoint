@@ -12,14 +12,14 @@ Examples (from the project root):
     python app/cli.py scan --file input/june_export.xlsx
     python app/cli.py campaigns --file "input/june_export.xlsx=Architect"
     python app/cli.py kpis --file "input/june_export.xlsx=Architect" \
-        --client "Famous Tate" --start 2026-06-01 --end 2026-06-30
+        --client "Acme Appliance Co" --start 2026-06-01 --end 2026-06-30
     python app/cli.py export --file "input/june_export.xlsx=Architect" \
-        --client "Famous Tate" --start 2026-06-01 --end 2026-06-30
+        --client "Acme Appliance Co" --start 2026-06-01 --end 2026-06-30
     python app/cli.py fill --file "input/june_export.xlsx=Architect" \
-        --client "Famous Tate" --template "Monthly Reporting Template.pptx" \
-        --output "output/Famous Tate/June_Report.pptx"
+        --client "Acme Appliance Co" --template "Monthly Reporting Template.pptx" \
+        --output "output/Acme Appliance Co/June_Report.pptx"
     python app/cli.py query --file "input/june_export.xlsx=Architect" \
-        --client "Famous Tate" --metric Impressions --breakdown zip
+        --client "Acme Appliance Co" --metric Impressions --breakdown zip
 
 ``--file`` may repeat and uses ``path=Platform`` (the platform must be
 configured in the app first). ``--campaigns`` limits a client to specific

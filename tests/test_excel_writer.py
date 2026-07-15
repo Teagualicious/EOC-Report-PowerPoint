@@ -37,13 +37,13 @@ class TestNormalizeValue:
 
 class TestNormalizeText:
     def test_all_caps_titled(self):
-        assert xw._normalize_text("FAMOUS TATE") == "Famous Tate"
+        assert xw._normalize_text("ACME APPLIANCE CO") == "Acme Appliance Co"
 
     def test_all_lower_titled(self):
-        assert xw._normalize_text("famous tate") == "Famous Tate"
+        assert xw._normalize_text("acme appliance co") == "Acme Appliance Co"
 
     def test_mixed_case_kept(self):
-        assert xw._normalize_text("Famous TATE Inc") == "Famous TATE Inc"
+        assert xw._normalize_text("Acme APPLIANCE Inc") == "Acme APPLIANCE Inc"
 
     def test_none_and_empty(self):
         assert xw._normalize_text(None) == ""

@@ -67,7 +67,7 @@ class TestCompletionRate:
 
     def test_rate_uses_video_starts_when_present(self):
         """Approved 2026-07-13: vendor dashboards compute VCR against video
-        starts — a 91.98 vs 98.36 mismatch on a real order traced to the
+        starts — a several-point VCR mismatch on a real order traced to the
         impressions denominator."""
         totals, details, _ = kpi.compute_kpis(self._data(with_starts=True))
         assert totals["Completion Rate"] == 95.0     # 855 / 900
@@ -81,7 +81,7 @@ class TestCompletionRate:
 
 class TestNonDedupOmission:
     """Cross-campaign Reach/Frequency cannot be deduplicated from campaign
-    aggregates (a real order read 1,039,763 vs the vendor's 325,644).
+    aggregates (a real order's campaign sum ran roughly 3x the vendor's deduplicated total).
     Approved 2026-07-14 (supersedes the 2026-07-13 relabel-and-flag rule):
     OMIT them from review KPIs entirely — totals AND per-campaign detail —
     until household-level data/formulas exist. The raw values still land in
@@ -125,19 +125,19 @@ class TestNonDedupOmission:
 
 class TestFormatKpiValue:
     """One formatter for every review display (cards, campaign summaries,
-    detail rows) — the cards previously showed 3,176,056.00 beside
-    3,453,076, and a bare 91.98 for a rate."""
+    detail rows) — the cards previously mixed trailing-.00 counts, whole
+    counts, and bare unmarked rates on the same screen."""
 
     def test_counts_render_whole_with_commas(self):
-        assert kpi.format_kpi_value("Impressions", 3453076) == "3,453,076"
-        assert kpi.format_kpi_value("Completions", 3176056.00) == "3,176,056"
+        assert kpi.format_kpi_value("Impressions", 2345678) == "2,345,678"
+        assert kpi.format_kpi_value("Completions", 8765432.00) == "8,765,432"
 
     def test_float_noise_from_sums_is_not_decimals(self):
         assert kpi.format_kpi_value("Completions",
-                                    3176056.0000001) == "3,176,056"
+                                    8765432.0000001) == "8,765,432"
 
     def test_rates_get_percent_sign(self):
-        assert kpi.format_kpi_value("Completion Rate", 91.98) == "91.98%"
+        assert kpi.format_kpi_value("Completion Rate", 87.65) == "87.65%"
         assert kpi.format_kpi_value("CTR", 0.42) == "0.42%"
         assert kpi.format_kpi_value("Impression Share", 55.5) == "55.50%"
 

@@ -7,7 +7,7 @@ qr = import_query_resolver()
 
 class TestStringKeys:
     def test_client_name(self):
-        assert qr.resolve_query("__client_name__", [], "Famous Tate") == "Famous Tate"
+        assert qr.resolve_query("__client_name__", [], "Acme Appliance Co") == "Acme Appliance Co"
 
     def test_date_range(self):
         assert qr.resolve_query("__date_range__", [], "",

@@ -63,9 +63,9 @@ Example prompts once connected:
 
 - *"Scan input/june_export.xlsx and tell me if our Architect platform
   config covers all its columns."*
-- *"Using input/june_export.xlsx as Architect, what were Famous Tate's
+- *"Using input/june_export.xlsx as Architect, what were Acme Appliance Co's
   impressions by zip in June? Any data flags?"*
-- *"Export the June workbook for Famous Tate and fill the Monthly
+- *"Export the June workbook for Acme Appliance Co and fill the Monthly
   Reporting Template — tell me if anything didn't fill."*
 
 ## Option 2 — Terminal CLI (any agent, scripts, schedulers)
@@ -78,14 +78,14 @@ python app/cli.py platforms
 python app/cli.py scan --file input/june_export.xlsx
 python app/cli.py campaigns --file "input/june_export.xlsx=Architect"
 python app/cli.py kpis --file "input/june_export.xlsx=Architect" \
-    --client "Famous Tate" --start 2026-06-01 --end 2026-06-30
+    --client "Acme Appliance Co" --start 2026-06-01 --end 2026-06-30
 python app/cli.py export --file "input/june_export.xlsx=Architect" \
-    --client "Famous Tate" --start 2026-06-01 --end 2026-06-30
+    --client "Acme Appliance Co" --start 2026-06-01 --end 2026-06-30
 python app/cli.py fill --file "input/june_export.xlsx=Architect" \
-    --client "Famous Tate" --template "Monthly Reporting Template.pptx" \
-    --output "output/Famous Tate/June_Report.pptx"
+    --client "Acme Appliance Co" --template "Monthly Reporting Template.pptx" \
+    --output "output/Acme Appliance Co/June_Report.pptx"
 python app/cli.py query --file "input/june_export.xlsx=Architect" \
-    --client "Famous Tate" --metric Impressions --breakdown zip
+    --client "Acme Appliance Co" --metric Impressions --breakdown zip
 ```
 
 `--file` repeats and takes `path=Platform`; `--campaigns "A,B"` limits a

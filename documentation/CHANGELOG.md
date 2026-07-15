@@ -1,5 +1,27 @@
 # Changelog
 
+## July 15, 2026 - Portable download + data-hygiene scrub (demo readiness)
+
+- **Every release now includes a portable zip**
+  (`IngestionEngine-<version>-portable-win64.zip`): the program plus a
+  `wheelhouse/` of Windows packages for every dependency. Download,
+  extract, double-click `Start Ingestion Engine.bat` — the first launch
+  installs the bundled packages automatically, offline, in under a
+  minute. Only Python 3.12 needs to be on the machine. Release notes now
+  tell downloaders which zip to grab.
+- The launcher understands all distribution shapes and picks
+  automatically: a fully portable `app/vendor/` folder (no install at
+  all — previously the launcher ignored it and wrongly attempted a pip
+  install on offline machines), the bundled wheelhouse (offline
+  install), or the internet (as before).
+- **Data-hygiene scrub ahead of external demos:** all example and test
+  client names are now clearly fictional ("Acme Appliance Co",
+  "Acme Motors"), and the handful of real-but-unattributed campaign
+  figures that had crept into docs, test docstrings, and the stand-in
+  template were genericized. A full audit found no client exports,
+  credentials, file paths, or personal information in the repository.
+- 297 automated tests pass.
+
 ## July 14, 2026 - Multi-line text fills land reliably; repeated report runs stay stable
 
 - **Assigned text no longer vanishes from exported decks.** Two root causes,
@@ -50,8 +72,8 @@
   vendor dashboards. They return when real household-level data/formulas
   are available; the raw values remain in the exported workbook.
 - **KPI numbers are formatted by what they are, everywhere.** Counts render
-  as whole comma-grouped numbers (no more "3,176,056.00" from float noise),
-  rates get a % sign ("91.98%"), money gets $ — consistently across KPI
+  as whole comma-grouped numbers (no more trailing ".00" from float noise),
+  rates get a % sign ("87.65%"), money gets $ — consistently across KPI
   cards, campaign summaries, and detail rows.
 - 291 automated tests pass.
 

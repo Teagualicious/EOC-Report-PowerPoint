@@ -30,7 +30,7 @@ The rest of the application can still parse files, review data, write a normal X
 
 1. Copy the complete `Jughead-Data-Engine` folder to the computer.
 2. Double-click **`Start Ingestion Engine.bat`**.
-3. The launcher finds Python, checks the version, and installs missing packages from `app/requirements.txt` on the first run.
+3. The launcher finds Python, checks the version, and installs missing packages from `app/requirements.txt` on the first run. If the folder contains a `wheelhouse/` directory (included in the portable release zip, `IngestionEngine-<version>-portable-win64.zip`), the packages install from it **offline** — no network needed. Otherwise they install from the internet as before. The portable zip's bundled packages target Python 3.12; on another Python version the launcher automatically falls back to the internet install.
 4. The main window opens.
 
 When support is needed, send `workspace/logs/ingestion_engine.log`.

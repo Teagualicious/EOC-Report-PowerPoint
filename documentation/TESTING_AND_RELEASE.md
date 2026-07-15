@@ -100,8 +100,23 @@ Use a Windows 10/11 machine with current desktop Excel and PowerPoint.
 - Default templates and mappings intended for distribution are present.
 - Documentation dates, test count, and known limitations are current.
 - `app/requirements.txt` is installable on a clean supported Python version.
-- Portable `app/vendor/` is omitted unless intentionally producing a portable package.
 - Windows Office acceptance was completed or explicitly marked as outstanding.
+
+Distribution shapes (the launcher supports all of them automatically):
+
+1. **Source zip** (GitHub's auto asset) — the launcher installs packages
+   from the internet on first run.
+2. **Portable zip** (`IngestionEngine-<version>-portable-win64.zip`,
+   published automatically by the Release workflow) — the source tree plus
+   a `wheelhouse/` of Windows wheels for every runtime dependency (built
+   for Python 3.12). The launcher detects `wheelhouse/` and installs from
+   it offline; on a different Python version it falls back to the internet
+   path. Only Python itself must already be on the machine.
+3. **Copy-the-folder vendor mode** — run `developer/tools/make_portable.bat`
+   once to populate `app/vendor/`; `app/main.py` prefers it and the
+   launcher skips installation entirely. The whole folder then runs on any
+   Windows machine with a matching Python, no install and no network.
+4. **PyInstaller build** (below) — no Python required on the target machine.
 
 ## PyInstaller check
 

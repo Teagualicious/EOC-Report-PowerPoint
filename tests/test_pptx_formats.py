@@ -7,33 +7,33 @@ pf = import_pptx_formats()
 
 class TestSplitCamelCase:
     def test_basic(self):
-        assert pf._split_camel_case("FamousTate") == "Famous Tate"
+        assert pf._split_camel_case("AcmeAppliance") == "Acme Appliance"
 
     def test_acronym(self):
         assert pf._split_camel_case("VLAReport") == "VLA Report"
 
     def test_already_spaced(self):
-        assert pf._split_camel_case("Famous Tate") == "Famous Tate"
+        assert pf._split_camel_case("Acme Appliance Co") == "Acme Appliance Co"
 
 
 class TestMatchTextStyle:
     def test_upper(self):
-        assert pf._match_text_style("Famous Tate", "CLIENT NAME") == "FAMOUS TATE"
+        assert pf._match_text_style("Acme Appliance Co", "CLIENT NAME") == "ACME APPLIANCE CO"
 
     def test_lower(self):
-        assert pf._match_text_style("Famous Tate", "client name") == "famous tate"
+        assert pf._match_text_style("Acme Appliance Co", "client name") == "acme appliance co"
 
     def test_title(self):
-        assert pf._match_text_style("famous tate", "Client Name") == "Famous Tate"
+        assert pf._match_text_style("acme appliance co", "Client Name") == "Acme Appliance Co"
 
     def test_mixed_keeps_value(self):
-        assert pf._match_text_style("Famous Tate", "cLiEnT") == "Famous Tate"
+        assert pf._match_text_style("Acme Appliance Co", "cLiEnT") == "Acme Appliance Co"
 
     def test_camel_case_split_applied(self):
-        assert pf._match_text_style("FamousTate", "Client Name") == "Famous Tate"
+        assert pf._match_text_style("AcmeAppliance", "Client Name") == "Acme Appliance"
 
     def test_empty_existing(self):
-        assert pf._match_text_style("Famous", "") == "Famous"
+        assert pf._match_text_style("Sample", "") == "Sample"
 
 
 class TestFormatDate:
@@ -121,8 +121,8 @@ class TestFormatValue:
         assert out == "05/01/2026 - 05/31/2026"
 
     def test_text_case_matching(self):
-        assert pf._format_value("Famous Tate", "text",
-                                existing_text="CLIENT NAME") == "FAMOUS TATE"
+        assert pf._format_value("Acme Appliance Co", "text",
+                                existing_text="CLIENT NAME") == "ACME APPLIANCE CO"
 
     def test_plain_string_no_existing(self):
         assert pf._format_value("hello", "text") == "hello"

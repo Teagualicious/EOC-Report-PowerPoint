@@ -58,7 +58,7 @@ class TestApplyPlatformConfig:
     def test_campaign_id_composition(self, tmp_path):
         parsed = {"detected_tables": [{
             "sheet_name": "Sheet1",
-            "rows": [{"Advertiser": "Famous Tate", "Order": "May VLA",
+            "rows": [{"Advertiser": "Acme Appliance Co", "Order": "May VLA",
                       "Impressions": 100}],
         }]}
         config = {"sheets": [{
@@ -71,7 +71,7 @@ class TestApplyPlatformConfig:
         }]}
         pipeline.apply_platform_config(parsed, config)
         key = list(parsed["campaign_metrics"].keys())[0]
-        assert key == "Famous Tate - May VLA|Impressions"
+        assert key == "Acme Appliance Co - May VLA|Impressions"
 
     def test_total_rows_skipped(self):
         parsed = {"detected_tables": [{

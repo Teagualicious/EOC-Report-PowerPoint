@@ -57,7 +57,7 @@ class TestWorkflowService:
         campaigns = workflow.list_campaigns(parsed)
         assert {"name": "Campaign A", "platform": "Architect"} in campaigns
 
-        data = workflow.client_dataset(parsed, "Famous Tate",
+        data = workflow.client_dataset(parsed, "Acme Appliance Co",
                                        start_date="2026-05-01",
                                        end_date="2026-05-31")
         kpis = workflow.kpis_for(data)
@@ -90,14 +90,14 @@ class TestWorkflowService:
         from openpyxl import load_workbook
 
         parsed, _ = workflow.parse_files([(sample_xlsx, "Architect")])
-        data = workflow.client_dataset(parsed, "Famous Tate")
-        result = workflow.export_workbook(data, "Famous Tate",
+        data = workflow.client_dataset(parsed, "Acme Appliance Co")
+        result = workflow.export_workbook(data, "Acme Appliance Co",
                                           str(tmp_path / "out"),
                                           inject_vba=False)
         assert os.path.exists(result["path"])
         # Same folder/file naming as the interactive export (safe name
         # helpers keep spaces)
-        assert "Famous Tate_unified_report" in result["path"]
+        assert "Acme Appliance Co_unified_report" in result["path"]
         wb = load_workbook(result["path"])
         assert {"Search", "Unified Data"} <= set(wb.sheetnames)
         assert result["rows"] > 0
@@ -116,7 +116,7 @@ class TestWorkflowService:
         box = slide.shapes.add_textbox(Inches(1), Inches(1),
                                        Inches(4), Inches(1))
         # Mixed case on purpose: all-caps template text triggers the
-        # locked case-forcing quirk (would render "FAMOUS TATE")
+        # locked case-forcing quirk (would render "ACME APPLIANCE CO")
         box.text_frame.text = "Placeholder"
         tpl_name = "unit_template.pptx"
         prs.save(str(isolated_workspace / "templates" / tpl_name))
@@ -125,16 +125,16 @@ class TestWorkflowService:
                   "skip": False, "assignments": []}}}}})
 
         parsed, _ = workflow.parse_files([(sample_xlsx, "Architect")])
-        data = workflow.client_dataset(parsed, "Famous Tate",
+        data = workflow.client_dataset(parsed, "Acme Appliance Co",
                                        start_date="2026-05-01",
                                        end_date="2026-05-31")
         out = str(tmp_path / "deck.pptx")
-        result = workflow.fill_deck(data, tpl_name, out, "Famous Tate")
+        result = workflow.fill_deck(data, tpl_name, out, "Acme Appliance Co")
 
         assert result["report"]["ok"] is True
         assert result["report"]["filled"] == 1
         filled = Presentation(result["path"])
-        assert filled.slides[0].shapes[0].text_frame.text == "Famous Tate"
+        assert filled.slides[0].shapes[0].text_frame.text == "Acme Appliance Co"
 
     def test_query_metric_matches_resolver(self, isolated_workspace,
                                            sample_xlsx):
@@ -161,7 +161,7 @@ class TestCli:
     def test_kpis_end_to_end(self, isolated_workspace, sample_xlsx, capsys):
         code, payload = self._run(
             ["kpis", "--file", f"{sample_xlsx}=Architect",
-             "--client", "Famous Tate",
+             "--client", "Acme Appliance Co",
              "--start", "2026-05-01", "--end", "2026-05-31"], capsys)
         assert code == 0 and payload["ok"] is True
         # JSON numbers, not stringified numpy scalars

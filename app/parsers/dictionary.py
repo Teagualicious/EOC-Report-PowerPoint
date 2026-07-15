@@ -144,11 +144,11 @@ def extract_row_context(row_dict, context_map):
     Extract context values from a data row.
     
     Args:
-        row_dict: {"Order": "Liberty Ford - Used VLA", "Impressions": 45230, ...}
+        row_dict: {"Order": "Acme Motors - Used VLA", "Impressions": 45230, ...}
         context_map: {"campaign_name": "Order"} from classify_columns
     
     Returns:
-        {"campaign_name": "Liberty Ford - Used VLA"}
+        {"campaign_name": "Acme Motors - Used VLA"}
     """
     result = {}
     for ctx_key, col_name in context_map.items():
