@@ -1,5 +1,32 @@
 # Changelog
 
+## July 14, 2026 - Dynamic output folder, faster exports, cleaner review KPIs
+
+- **Renaming the project folder no longer resurrects the old folder.**
+  Saving Settings used to pin the absolute default output path into
+  settings.json; after a rename, exports recreated the old folder name
+  (e.g. `Jughead-Data-Engine-1.27.0\output`) and wrote there. The default
+  now stays dynamic: it is never persisted, and a stale default-shaped
+  path from a previous location falls back to the current project's
+  `output` folder on launch. Custom output folders are untouched.
+- **The export stage (client selection → review) is faster and shows live
+  progress.** A multi-client export now launches ONE hidden Excel process
+  for the whole batch instead of one per client (Excel startup was the
+  dominant fixed cost of adding the interactive search), and the workbook
+  row writer was rewritten around a faster iteration path for large files.
+  The status line now reports each stage as it happens ("writing workbook
+  + search…", "computing KPIs…") instead of a single static message.
+- **Reach and Frequency no longer appear in the review KPIs** — totals or
+  per-campaign detail. Campaign aggregates cannot be household-deduplicated,
+  so the previous "not deduplicated" labels still invited comparison with
+  vendor dashboards. They return when real household-level data/formulas
+  are available; the raw values remain in the exported workbook.
+- **KPI numbers are formatted by what they are, everywhere.** Counts render
+  as whole comma-grouped numbers (no more "3,176,056.00" from float noise),
+  rates get a % sign ("91.98%"), money gets $ — consistently across KPI
+  cards, campaign summaries, and detail rows.
+- 291 automated tests pass.
+
 ## July 14, 2026 - Stable shape identity for the PowerPoint mapper
 
 - Template fills now find each mapped shape by its persistent PowerPoint

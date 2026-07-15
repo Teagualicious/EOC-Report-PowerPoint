@@ -173,3 +173,37 @@ class TestWriteToExcel:
         assert first == second
         assert first_values == second_values
 
+
+
+class TestExcelSession:
+    """The batch export reuses one Excel COM process (engine.excel_vba.
+    ExcelSession). Where COM is unavailable the session must be a safe
+    no-op and injection must keep its per-call fallback behavior."""
+
+    @staticmethod
+    def _com_available():
+        try:
+            import win32com.client  # noqa: F401
+            return True
+        except ImportError:
+            return False
+
+    def test_session_is_safe_noop_without_com(self):
+        if self._com_available():
+            pytest.skip("would launch a real Excel process")
+        from engine.excel_vba import ExcelSession
+        with ExcelSession() as session:
+            assert session.app is None
+        assert session.app is None  # exit is idempotent
+
+    def test_inject_without_shared_app_keeps_fallback_reason(self, tmp_path):
+        if self._com_available():
+            pytest.skip("would launch a real Excel process")
+        from engine.excel_vba import inject_search_vba
+        xlsx = tmp_path / "r.xlsx"
+        xlsx.write_bytes(b"x")
+
+        final_path, reason = inject_search_vba(str(xlsx), app=None)
+
+        assert final_path == str(xlsx)
+        assert "pywin32" in reason

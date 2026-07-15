@@ -123,3 +123,40 @@ def test_custom_output_setting_is_preserved(monkeypatch, tmp_path):
         json.dumps({"output_folder": str(custom)}), encoding="utf-8")
 
     assert settings.load_settings()["output_folder"] == str(custom)
+
+
+def test_renamed_project_stale_default_output_falls_back(monkeypatch, tmp_path):
+    """Regression: opening Settings once pinned the ABSOLUTE default output
+    path into settings.json; after the project folder was renamed, exports
+    recreated the old folder name and silently wrote there. A default-shaped
+    path (…/output) that no longer exists follows the current project."""
+    from config import settings
+
+    project, workspace = _redirect_layout(monkeypatch, tmp_path)
+    monkeypatch.setattr(settings, "SETTINGS_PATH", str(workspace / "settings.json"))
+    monkeypatch.setattr(settings, "WORKSPACE_DIR", str(workspace))
+    monkeypatch.setattr(settings, "OUTPUT_DIR", str(project / "output"))
+    workspace.mkdir(parents=True)
+    old_default = tmp_path / "Jughead-Data-Engine-1.27.0" / "output"  # never created
+    (workspace / "settings.json").write_text(
+        json.dumps({"output_folder": str(old_default)}), encoding="utf-8")
+
+    assert settings.load_settings()["output_folder"] == str(project / "output")
+
+
+def test_existing_folder_named_output_is_a_deliberate_choice(monkeypatch, tmp_path):
+    """A custom folder that happens to be named 'output' but still exists
+    on disk must NOT be treated as a stale default."""
+    from config import settings
+
+    project, workspace = _redirect_layout(monkeypatch, tmp_path)
+    monkeypatch.setattr(settings, "SETTINGS_PATH", str(workspace / "settings.json"))
+    monkeypatch.setattr(settings, "WORKSPACE_DIR", str(workspace))
+    monkeypatch.setattr(settings, "OUTPUT_DIR", str(project / "output"))
+    workspace.mkdir(parents=True)
+    elsewhere = tmp_path / "network-share" / "output"
+    elsewhere.mkdir(parents=True)
+    (workspace / "settings.json").write_text(
+        json.dumps({"output_folder": str(elsewhere)}), encoding="utf-8")
+
+    assert settings.load_settings()["output_folder"] == str(elsewhere)

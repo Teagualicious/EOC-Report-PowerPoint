@@ -487,7 +487,16 @@ class SettingsWindow:
         settings = load_settings()
         settings["platforms"] = self.platforms
         settings["theme"] = self.theme_var.get()
-        settings["output_folder"] = self.output_folder_var.get()
+        # Persist the output folder only when it differs from the default:
+        # storing the default pins an ABSOLUTE path, and after the project
+        # folder is renamed/moved that stale path gets recreated on export.
+        # An unset key means "follow the project folder" forever.
+        chosen = self.output_folder_var.get().strip()
+        if not chosen or os.path.normcase(os.path.abspath(chosen)) == \
+                os.path.normcase(os.path.abspath(OUTPUT_DIR)):
+            settings.pop("output_folder", None)
+        else:
+            settings["output_folder"] = chosen
         # Purge settings retired with the Search dashboard rework
         for stale in ("dashboard_metrics", "export_client_report",
                       "export_dashboard", "export_unified"):

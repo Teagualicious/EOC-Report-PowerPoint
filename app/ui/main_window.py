@@ -480,44 +480,55 @@ class IngestionEngine(ReviewMixin):
             for client_name in client_assignments
         }
 
-        def work():
+        def work(progress):
+            from engine.excel_vba import ExcelSession
             results = []
             errors = []
             vba_errors = []
-            for client_name, campaigns in client_assignments.items():
-                safe_client = safe_clients[client_name]
-                client_folder = os.path.join(output_folder, safe_client)
-                client_data = filter_data_by_campaigns(self.parsed_data, campaigns)
-                for data in client_data:
-                    data["client_name"] = client_name
-                    data["campaign_type"] = ""
-                    data["start_date"] = start_date
-                    data["end_date"] = end_date
+            total = len(client_assignments)
+            # One Excel process for the whole batch — launching Excel per
+            # client was the dominant fixed cost of the export stage.
+            with ExcelSession() as excel:
+                for i, (client_name, campaigns) in enumerate(
+                        client_assignments.items(), 1):
+                    label = (f"{client_name}" if total == 1
+                             else f"({i}/{total}) {client_name}")
+                    safe_client = safe_clients[client_name]
+                    client_folder = os.path.join(output_folder, safe_client)
+                    client_data = filter_data_by_campaigns(self.parsed_data, campaigns)
+                    for data in client_data:
+                        data["client_name"] = client_name
+                        data["campaign_type"] = ""
+                        data["start_date"] = start_date
+                        data["end_date"] = end_date
 
-                output_path = os.path.join(
-                    client_folder, f"{safe_client}_unified_report.xlsx")
-                try:
-                    os.makedirs(client_folder, exist_ok=True)
-                    final_path, vba_error = write_to_excel(client_data, output_path, "")
-                    if vba_error:
-                        vba_errors.append(vba_error)
-                    rows = sum(len(data.get("campaign_metrics", {})) +
-                               len(data.get("level_data", [])) for data in client_data)
-                    results.append({
-                        "client_name": client_name,
-                        "campaigns": campaigns,
-                        "client_data": client_data,
-                        "output_path": final_path,
-                        "rows": rows,
-                        "folder": client_folder,
-                        # Precomputed here, off the Tk thread — building the
-                        # KPI DataFrame for a large client froze the UI when
-                        # the review screen opened.
-                        "kpi": compute_kpis(client_data),
-                    })
-                except Exception as exc:
-                    logger.exception("Excel export failed for %s", client_name)
-                    errors.append((client_name, output_path, str(exc)))
+                    output_path = os.path.join(
+                        client_folder, f"{safe_client}_unified_report.xlsx")
+                    try:
+                        os.makedirs(client_folder, exist_ok=True)
+                        progress(f"{label}: writing workbook + search…")
+                        final_path, vba_error = write_to_excel(
+                            client_data, output_path, "", excel_app=excel.app)
+                        if vba_error:
+                            vba_errors.append(vba_error)
+                        rows = sum(len(data.get("campaign_metrics", {})) +
+                                   len(data.get("level_data", [])) for data in client_data)
+                        progress(f"{label}: computing KPIs…")
+                        results.append({
+                            "client_name": client_name,
+                            "campaigns": campaigns,
+                            "client_data": client_data,
+                            "output_path": final_path,
+                            "rows": rows,
+                            "folder": client_folder,
+                            # Precomputed here, off the Tk thread — building the
+                            # KPI DataFrame for a large client froze the UI when
+                            # the review screen opened.
+                            "kpi": compute_kpis(client_data),
+                        })
+                    except Exception as exc:
+                        logger.exception("Excel export failed for %s", client_name)
+                        errors.append((client_name, output_path, str(exc)))
             return results, errors, vba_errors
 
         def success(payload):
@@ -542,7 +553,13 @@ class IngestionEngine(ReviewMixin):
             self._set_busy(False, "Export failed")
             messagebox.showerror("Export Error", f"The export could not be completed:\n{exc}")
 
-        run_in_background(self.root, work, success, error)
+        def show_progress(message):
+            # Status text only — _set_busy would restart the progress bar
+            # animation on every stage change
+            self.status_label.configure(text=message, fg=self.t["accent"])
+
+        run_in_background(self.root, work, success, error,
+                          on_progress=show_progress)
 
     def _show_next_review(self):
         if self._review_index >= len(self._export_results):

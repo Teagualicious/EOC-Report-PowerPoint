@@ -238,19 +238,36 @@ def brand_header(parent, theme, title, subtitle="", step=None, action=None):
     return frame
 
 
-def run_in_background(root, work, on_success, on_error, poll_ms=80):
-    """Run non-Tk work on a daemon thread and deliver callbacks on Tk's thread."""
+def run_in_background(root, work, on_success, on_error, poll_ms=80,
+                      on_progress=None):
+    """Run non-Tk work on a daemon thread and deliver callbacks on Tk's thread.
+
+    With on_progress set, work is called as work(progress) where
+    progress(message) may be called freely from the worker thread; each
+    message is delivered to on_progress(message) on Tk's thread, in order,
+    before the final success/error callback.
+    """
     result_queue = queue.Queue(maxsize=1)
+    progress_queue = queue.Queue() if on_progress is not None else None
 
     def runner():
         try:
-            result_queue.put((True, work()))
+            if progress_queue is not None:
+                result_queue.put((True, work(progress_queue.put)))
+            else:
+                result_queue.put((True, work()))
         except Exception as exc:  # delivered to the UI callback with traceback intact in logs
             result_queue.put((False, exc))
 
     threading.Thread(target=runner, daemon=True).start()
 
     def poll():
+        if progress_queue is not None:
+            while True:
+                try:
+                    on_progress(progress_queue.get_nowait())
+                except queue.Empty:
+                    break
         try:
             ok, payload = result_queue.get_nowait()
         except queue.Empty:

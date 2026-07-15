@@ -51,12 +51,15 @@ CR_TITLE_FONT = Font(name="Calibri", bold=True, size=22, color="FFFFFF")
 CR_DATE_FONT = Font(name="Calibri", size=12, color="B0C4DE")
 
 def write_to_excel(parsed_data_list, output_path, platform_name="",
-                   inject_vba=True):
+                   inject_vba=True, excel_app=None):
     """Write the unified workbook: Search dashboard + Unified Data.
 
     Attempts to inject the interactive VBA search engine and save as .xlsm
     (Windows + Excel + trust setting required); otherwise leaves a plain
     .xlsx with the data intact. Returns (final_path, vba_error_or_None).
+    excel_app: an open Excel COM Application to reuse for the injection
+    (see engine.excel_vba.ExcelSession) — batch exports pay the Excel
+    startup cost once instead of once per client.
 
     The workbook is ALWAYS rebuilt from scratch and the VBA re-injected.
     The old re-export path edited the existing .xlsm in place with
@@ -113,13 +116,16 @@ def write_to_excel(parsed_data_list, output_path, platform_name="",
         c.font = HEADER_FONT; c.fill = HEADER_FILL
         c.alignment = Alignment(horizontal="center"); c.border = THIN_BORDER
 
-    for ri, (_, rd) in enumerate(df.iterrows(), 2):
-        for ci, col in enumerate(SCHEMA_COLUMNS, 1):
-            val = rd.get(col)
+    # itertuples over reindexed columns: iterrows built a Series per row and
+    # made this loop the slowest part of large exports
+    metric_ci = SCHEMA_COLUMNS.index("metric_value") + 1
+    row_data = df.reindex(columns=SCHEMA_COLUMNS)
+    for ri, values in enumerate(row_data.itertuples(index=False, name=None), 2):
+        for ci, val in enumerate(values, 1):
             if pd.isna(val): val = None
             c = ws.cell(row=ri, column=ci, value=val)
             c.font = DATA_FONT; c.border = THIN_BORDER
-            if col == "metric_value" and val is not None:
+            if ci == metric_ci and val is not None:
                 _format_cell(c, val)
 
     widths = {"client": 18, "campaign": 35, "campaign_type": 15, "source": 18,
@@ -155,7 +161,7 @@ def write_to_excel(parsed_data_list, output_path, platform_name="",
     vba_error = None
     if inject_vba:
         from engine.excel_vba import inject_search_vba
-        final_path, vba_error = inject_search_vba(xlsx_path)
+        final_path, vba_error = inject_search_vba(xlsx_path, app=excel_app)
         if vba_error:
             logger.warning("Search VBA not injected: %s", vba_error)
 

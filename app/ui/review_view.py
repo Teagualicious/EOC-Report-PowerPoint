@@ -12,7 +12,7 @@ from ui.utils import (brand_header, bordered_card, fit_window, modern_button,
                       run_in_background)
 from tkinter import ttk, filedialog, messagebox
 
-from engine.kpi import KPI_METRICS, compute_kpis
+from engine.kpi import KPI_METRICS, compute_kpis, format_kpi_value
 
 logger = logging.getLogger(__name__)
 
@@ -113,12 +113,8 @@ class ReviewMixin:
             card = bordered_card(kpi_row, t, padx=12, pady=8)
             card.pack(side="left", padx=4, fill="x", expand=True)
             tk.Label(card, text=metric, font=("Segoe UI", 9), bg=t["card"], fg=t["muted"]).pack()
-            if isinstance(val, float) and val != int(val):
-                display = f"${val:,.2f}" if "cost" in metric.lower() else f"{val:,.2f}"
-            elif isinstance(val, (int, float)):
-                display = f"${int(val):,}" if "cost" in metric.lower() else f"{int(val):,}"
-            else: display = str(val)
-            tk.Label(card, text=display, font=("Segoe UI", 16, "bold"), bg=t["card"], fg=t["fg"]).pack()
+            tk.Label(card, text=format_kpi_value(metric, val),
+                     font=("Segoe UI", 16, "bold"), bg=t["card"], fg=t["fg"]).pack()
 
         # Flags
         if flags:
@@ -194,8 +190,7 @@ class ReviewMixin:
             for km in camp_order[:3]:
                 v = metrics.get(km)
                 if v is not None and isinstance(v, (int, float)):
-                    vfmt = f"{v:,.2f}" if isinstance(v, float) and v != int(v) else f"{int(v):,}"
-                    summary.append(f"{km}: {vfmt}")
+                    summary.append(f"{km}: {format_kpi_value(km, v)}")
             tk.Label(ch, text=f"▸  {camp_name}", font=("Segoe UI", 10, "bold"),
                      bg=t["card"], fg=t["fg"]).pack(side="left", padx=10, pady=5)
             if summary:
@@ -212,10 +207,7 @@ class ReviewMixin:
                     row.pack(fill="x", pady=1)
                     tk.Label(row, text=met, font=("Segoe UI", 9), bg=t["bg"],
                              fg=t["muted"], width=22, anchor="w").pack(side="left")
-                    if isinstance(val, float) and val == int(val): vd = f"{int(val):,}"
-                    elif isinstance(val, float): vd = f"{val:,.2f}"
-                    elif isinstance(val, int): vd = f"{val:,}"
-                    else: vd = str(val)
+                    vd = format_kpi_value(met, val)
                     tk.Label(row, text=vd, font=("Segoe UI", 9, "bold"), bg=t["bg"],
                              fg=t["fg"]).pack(side="left")
 

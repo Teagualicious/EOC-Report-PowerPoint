@@ -20,7 +20,14 @@ DEFAULT_UNCHECKED = ["25% Completions", "50% Completions", "75% Completions",
 
 
 def _normalize_settings(data):
-    """Translate settings that referenced defaults from older layouts."""
+    """Translate settings that referenced defaults from older layouts.
+
+    A stored output_folder that (a) was the old workspace/output default or
+    (b) is a default-shaped path (…/output) that no longer exists — the
+    signature of a project folder that was renamed or moved — falls back to
+    the CURRENT project's output folder. Otherwise exports would silently
+    recreate the old folder name and write there.
+    """
     if not isinstance(data, dict):
         return {"platforms": {}, "theme": "light"}
 
@@ -28,13 +35,20 @@ def _normalize_settings(data):
     previous_default = os.path.join(WORKSPACE_DIR, "output")
     if output_folder:
         try:
-            is_previous_default = (
-                os.path.normcase(os.path.abspath(output_folder))
+            stored = os.path.abspath(output_folder)
+            stale = (
+                os.path.normcase(stored)
                 == os.path.normcase(os.path.abspath(previous_default))
+            ) or (
+                os.path.basename(os.path.normpath(stored)).lower() == "output"
+                and not os.path.isdir(stored)
             )
         except (OSError, TypeError, ValueError):
-            is_previous_default = False
-        if is_previous_default:
+            stale = False
+        if stale and os.path.normcase(stored) != os.path.normcase(
+                os.path.abspath(OUTPUT_DIR)):
+            logger.info("Stored output folder %s is stale — using the "
+                        "current default %s", output_folder, OUTPUT_DIR)
             data = dict(data)
             data["output_folder"] = OUTPUT_DIR
     return data
