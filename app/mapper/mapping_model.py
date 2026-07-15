@@ -206,9 +206,14 @@ class MappingModel:
         self._notify("image", slide_num, shape_id)
 
     def set_skip(self, slide_num, shape_id, skip):
-        """Set the skip flag. Note: preserved pre-model behavior — this
-        replaces the whole shape mapping, discarding any assignments."""
-        self._shape_mappings(slide_num)[str(shape_id)] = {"skip": skip}
+        """Set the skip flag, PRESERVING the shape's assignments.
+
+        (Changed 2026-07-15, owner decision — the pre-model behavior
+        replaced the whole mapping, so an exploratory Skip click silently
+        discarded the shape's assignments. Toggling skip off now restores
+        exactly what was there.)"""
+        smap = self._shape_mappings(slide_num).setdefault(str(shape_id), {})
+        smap["skip"] = skip
         self._stamp(slide_num, shape_id)
         self._notify("skip", slide_num, shape_id)
 

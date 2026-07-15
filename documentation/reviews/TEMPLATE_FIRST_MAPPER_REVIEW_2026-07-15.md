@@ -186,22 +186,35 @@ modules that touch the library so the IR isolates a future swap.
 Re-evaluate Aspose.Slides specifically at Phase C (charts), priced
 against real chart-heavy template volume.
 
-## Open questions for the owner (record answers here)
+## Open questions — PROVISIONAL answers in effect (2026-07-15)
 
-1. Fidelity bar: is "indistinguishable at presentation distance"
-   acceptable, or must it survive side-by-side pixel inspection? (Decides
-   how aggressively Phase A leans on verbatim XML.)
-2. Should the COM live preview concept carry over (watch the built deck
-   render live), or is a static PNG preview of the built deck sufficient?
-   (Recommendation: static preview — the build is fast and deterministic,
-   and dropping COM here removes the whole health-tracking apparatus.)
-3. Template store location: confirm `workspace/template_store/` is
-   acceptable (portable-bundle implications for moving templates between
-   machines, like mapped templates today).
-4. When Phase B works, does the pivot-driven deck generation idea
-   (STATUS Phase-6-era discussion, pitch "Next" bullet) merge into this as
-   "a template whose slots are fed by a pivot spec"? (They compose
-   naturally; worth deciding before Phase B's mapping schema is frozen.)
+The owner approved starting Phase A; the question round was cut off by a
+tooling failure, so Phase A proceeded on the recommended defaults below.
+**Owner: confirm or override each — only #4 gates Phase B's schema.**
+
+1. Fidelity bar → **pixel-exact (provisional)**: Phase A renders static
+   shapes exclusively from verbatim XML, so this is satisfied by
+   construction.
+2. Preview → **static preview of the built deck (provisional)**: no COM
+   anywhere in the template-first pipeline.
+3. Store location → **`workspace/template_store/<template_id>/`
+   (provisional)**: implemented as the default in
+   `engine/template_ir/ingest.py`; gitignored.
+4. Pivot-driven generation merge → **deferred to Phase B (provisional)**:
+   nothing in the Phase A schema blocks either choice; decide before the
+   Phase B mapping schema freezes.
+
+## Phase A — DONE 2026-07-15 (all-green in CI)
+
+`app/engine/template_ir/` (schema.py stdlib-dataclass IR + JSON store;
+ingest.py deck → IR + verbatim shape XML + extracted image assets keyed
+by relationship id; build.py IR → new deck by verbatim XML copies with
+image relationships re-targeted). Charts are detected and marked
+unsupported — the builder skips them and reports (Phase C). Tests in
+`tests/test_template_ir.py` prove the round-trip invariant: ingest →
+build → re-ingest is equivalent (XML byte-identical modulo relationship
+ids), run formatting and image bytes survive, and skips are always
+reported. Next: Phase B (classification + review GUI + slots + mapping).
 
 ## Cross-references
 

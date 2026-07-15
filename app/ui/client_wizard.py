@@ -157,8 +157,6 @@ class ClientWizard:
         # Build campaign checkboxes
         self.campaign_vars = {}
         self.campaign_widgets = {}  # for filtering
-        self._drag_active = False
-        self._drag_value = True
         self.selection_state = {c["name"]: False for c in self.unassigned}
         self._build_campaign_list()
 
@@ -210,29 +208,14 @@ class ClientWizard:
 
                 self.campaign_widgets[name] = {"frame": row, "var": var, "cb": cb, "label": lbl}
 
-                # Click anywhere on row to toggle
+                # Click anywhere on row to toggle. (Drag-select was removed
+                # as dead code — Tk's implicit grab during a button press
+                # eats <Enter> events, so the drag handlers never fired;
+                # roadmap Phase 5 decision.)
                 def toggle(event, v=var):
                     v.set(not v.get())
                 row.bind("<Button-1>", toggle)
                 lbl.bind("<Button-1>", toggle)
-
-                # Drag select
-                def drag_start(event, v=var):
-                    self._drag_active = True
-                    self._drag_value = not v.get()
-                    v.set(self._drag_value)
-                def drag_enter(event, v=var):
-                    if self._drag_active:
-                        v.set(self._drag_value)
-                def drag_end(event):
-                    self._drag_active = False
-
-                row.bind("<ButtonPress-1>", drag_start)
-                lbl.bind("<ButtonPress-1>", drag_start)
-                row.bind("<Enter>", drag_enter)
-                lbl.bind("<Enter>", drag_enter)
-                row.bind("<ButtonRelease-1>", drag_end)
-                lbl.bind("<ButtonRelease-1>", drag_end)
 
     def _filter_list(self):
         """Debounced: rebuilding hundreds of checkbox rows on every keystroke

@@ -104,15 +104,19 @@ identity still resolve positionally, bit-for-bit as before.
    mapped shape → "With Gaps" reports it, nothing misfilled.
 6. Image / chart / table live assignments still work (uid kwarg regression).
 
-### Phase 5 — Small fixes from the July 11 code review
-- Debounce template-preview selection (`after(300)`) + serialize
-  `_export_thumbnail` per path (PowerPoint process pile-up / PNG race).
-- Client wizard drag-select is dead code (Tk implicit grab eats `<Enter>`
-  during button press); reimplement via `<B1-Motion>` + `winfo_containing`,
-  or remove the drag bindings.
-- Decide: `state("zoomed")` vs `fit_window` in ClientWizard (currently both;
-  zoom wins).
-- Decide: keep or fix all-caps placeholder case-forcing (Phase 1 quirk).
+### Phase 5 — Small fixes from the July 11 code review — DONE 2026-07-15
+- ~~Debounce template-preview selection~~ — done (250 ms debounce in
+  review_view's template selector; `_export_thumbnail` was serialized in
+  v1.30.0).
+- ~~Client wizard drag-select dead code~~ — removed (owner decision: the
+  bindings never fired; plain click-to-toggle remains).
+- ~~zoomed vs fit_window in ClientWizard~~ — resolved v1.25.0 in favor of
+  `fit_window`.
+- ~~All-caps case-forcing~~ — owner decision 2026-07-15: KEEP. Values match
+  the deck's case ("CLIENT NAME" placeholder → "ACME HOLDING"). Stays
+  locked by its characterization tests.
+- Bonus (owner decision 2026-07-15): Skip now PRESERVES a shape's
+  assignments instead of silently discarding them.
 
 ### Parking lot
 - **Template-first mapper architecture (v2 direction, accepted 2026-07-15):**

@@ -1,5 +1,33 @@
 # Changelog
 
+## July 15, 2026 - Saved-query fidelity, mapper polish, template-first Phase A
+
+- **Saved builder queries now re-resolve to exactly the value shown when
+  they were applied.** The resolver previously ignored the Advanced Query
+  Builder's campaign/breakdown/value/Top-N selections, so a report
+  refilled in a later session could silently diverge from the pivot the
+  user previewed. Builder queries now recompute through the same pivot
+  engine (moved to `engine/pivot.py`, shared by the builder UI and the
+  resolver — and importable headlessly by the CLI/MCP tools).
+- **Skip no longer discards assignments.** Toggling a shape's Skip
+  checkbox is now a flag on top of its mapping — untoggle and everything
+  is back. (Previously an exploratory click silently wiped the shape's
+  assignments.)
+- Mapper polish: template-selector previews debounce (no more one
+  PowerPoint thumbnail export per arrow-key step), dead drag-select code
+  removed from the client wizard, and the all-caps case-matching rule is
+  now an explicit product decision: inserted values match the deck's
+  case ("CLIENT NAME" placeholder → "ACME HOLDING").
+- **Template-first mapper Phase A shipped** (`app/engine/template_ir/`):
+  ingest any deck into a JSON template schema + extracted assets, then
+  rebuild a pixel-identical deck from verbatim shape XML — images
+  re-linked, charts skipped loudly with a report (chart cloning is
+  Phase C). The ingest→build→re-ingest round-trip is locked by tests and
+  runs entirely in CI (no PowerPoint, no COM). This is the foundation for
+  the slot-based mapper rework documented in
+  `documentation/proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md`.
+- 306 automated tests pass.
+
 ## July 15, 2026 - Portable download + data-hygiene scrub (demo readiness)
 
 - **Every release now includes a portable zip**
