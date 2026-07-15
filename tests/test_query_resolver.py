@@ -94,3 +94,89 @@ class TestHelpers:
         # Display alias applied to label but key keeps the raw metric
         completions = [o for o in options if o["key"] == "__total_100% Completions__"]
         assert completions[0]["label"] == "📊 Total Completions"
+
+
+# ── Builder-query re-resolution (resolver fidelity, 2026-07-15) ──────────────
+# Queries saved by the Advanced Query Builder carry the full selection
+# (campaigns/sources/values/top_n). resolve_query used to ignore those keys,
+# so a refill in a later session could silently diverge from the pivot value
+# the user saw at apply time. Builder queries now re-resolve through the
+# same engine.pivot.build_pivot the builder previewed.
+
+def _builder_client_data():
+    return [{
+        "campaign_metrics": {
+            "A|Impressions": {"value": 1000, "universal_name": "Impressions",
+                              "campaign_name": "A"},
+            "B|Impressions": {"value": 500, "universal_name": "Impressions",
+                              "campaign_name": "B"},
+        },
+        "level_data": [
+            {"metric_name": "Impressions", "metric_value": 600,
+             "metric_level": "zip:11111", "_campaign": "A"},
+            {"metric_name": "Impressions", "metric_value": 400,
+             "metric_level": "zip:22222", "_campaign": "A"},
+            {"metric_name": "Impressions", "metric_value": 300,
+             "metric_level": "zip:11111", "_campaign": "B"},
+        ],
+    }]
+
+
+def test_builder_query_matches_apply_time_pivot_total():
+    """The resolved value must equal pivot_total(build_pivot(...)) — the
+    exact number the builder displayed and cached when the user applied."""
+    import pandas as pd
+    from engine.pivot import build_pivot, pivot_total
+    from engine.query_resolver import resolve_query
+
+    query = {"metric": "Impressions", "agg": "sum", "top_n": "1",
+             "campaigns": [], "sources": ["zip"], "values": []}
+    resolved = resolve_query(query, _builder_client_data())
+
+    rows = pd.DataFrame([
+        {"campaign": "A", "metric": "Impressions", "value": 1000,
+         "source": "campaign", "level_value": ""},
+        {"campaign": "B", "metric": "Impressions", "value": 500,
+         "source": "campaign", "level_value": ""},
+        {"campaign": "A", "metric": "Impressions", "value": 600,
+         "source": "zip", "level_value": "11111"},
+        {"campaign": "A", "metric": "Impressions", "value": 400,
+         "source": "zip", "level_value": "22222"},
+        {"campaign": "B", "metric": "Impressions", "value": 300,
+         "source": "zip", "level_value": "11111"},
+    ])
+    pivot, _ = build_pivot(rows, "Impressions", "sum", "1", [], ["zip"], [])
+    assert resolved == pivot_total(pivot)
+    assert resolved == 900  # top-1 zip row: 11111 = 600 + 300
+
+
+def test_builder_query_honors_campaign_and_value_selections():
+    from engine.query_resolver import resolve_query
+    data = _builder_client_data()
+
+    only_a = resolve_query({"metric": "Impressions", "agg": "sum",
+                            "top_n": "all", "campaigns": ["A"],
+                            "sources": ["zip"], "values": []}, data)
+    assert only_a == 1000  # A's zip rows only: 600 + 400
+
+    one_zip = resolve_query({"metric": "Impressions", "agg": "sum",
+                             "top_n": "all", "campaigns": [],
+                             "sources": ["zip"], "values": ["22222"]}, data)
+    assert one_zip == 400
+
+
+def test_builder_query_empty_sources_means_campaign_totals():
+    from engine.query_resolver import resolve_query
+    total = resolve_query({"metric": "Impressions", "agg": "sum",
+                           "top_n": "all", "campaigns": [], "sources": [],
+                           "values": []}, _builder_client_data())
+    assert total == 1500  # campaign-total rows only, never pooled levels
+
+
+def test_plain_queries_keep_historical_resolution():
+    """Queries without builder keys must go through the unchanged
+    metric/breakdown/filter/agg path (best-source-per-campaign etc.)."""
+    from engine.query_resolver import resolve_query
+    v = resolve_query({"metric": "Impressions", "breakdown": "all",
+                       "filter": "all", "agg": "sum"}, _builder_client_data())
+    assert v == 1500  # best source per campaign: A=1000 summary, B=500

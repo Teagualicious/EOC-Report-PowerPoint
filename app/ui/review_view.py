@@ -362,7 +362,19 @@ class ReviewMixin:
 
             run_in_background(win, work, success, error)
 
-        lb.bind("<<ListboxSelect>>", _show_thumbnail)
+        # Debounced selection: arrowing/clicking through the template list
+        # fired one PowerPoint thumbnail export per step (roadmap Phase 5)
+        _debounce = [None]
+
+        def _select_debounced(event=None):
+            if _debounce[0] is not None:
+                try:
+                    win.after_cancel(_debounce[0])
+                except Exception:
+                    logger.debug("Thumbnail debounce cancel failed", exc_info=True)
+            _debounce[0] = win.after(250, _show_thumbnail)
+
+        lb.bind("<<ListboxSelect>>", _select_debounced)
         # Show first template info
         if mapped_templates:
             win.after_idle(_show_thumbnail)

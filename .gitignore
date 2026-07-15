@@ -18,6 +18,8 @@ workspace/logs/*
 workspace/templates/images/*
 !workspace/templates/images/.gitkeep
 workspace/templates/thumbs/*
+workspace/template_store/
+workspace/mappings/
 _preview_*.pptx
 _scan_*.pptx
 

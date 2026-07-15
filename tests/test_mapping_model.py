@@ -110,16 +110,22 @@ def test_assign_image_schema(model):
                     "assignments": []}
 
 
-def test_set_skip_replaces_shape_mapping(model):
-    """Preserved pre-model behavior: toggling skip discards the shape's
-    assignments. Locked here so a future fix is a deliberate change."""
-    model.assign_metric(1, 3, "Impressions")
+def test_set_skip_preserves_assignments(model):
+    """Owner decision 2026-07-15 (mapper roadmap Phase 5): Skip is a flag
+    on top of the mapping — toggling it must never discard assignments.
+    (Replaces the pre-model discard behavior this test previously locked.)"""
+    model.assign_metric(1, 3, "Impressions", replace_text="[I]")
     model.set_skip(1, 3, True)
 
-    assert model.shape_map(1, 3) == {"skip": True}
+    assert model.shape_map(1, 3)["skip"] is True
+    assert [a["metric"] for a in model.assignments(1, 3)] == ["Impressions"]
+
     model.set_skip(1, 3, False)
-    assert model.shape_map(1, 3) == {"skip": False}
-    assert model.assignments(1, 3) == []
+    assert model.shape_map(1, 3)["skip"] is False
+    assert [a["metric"] for a in model.assignments(1, 3)] == ["Impressions"]
+
+    model.set_skip(2, 9, True)  # never-mapped shape — creates a bare flag
+    assert model.shape_map(2, 9) == {"skip": True}
 
 
 def test_clear_shape_removes_mapping_and_tolerates_unknown(model):
@@ -240,8 +246,10 @@ def test_mutations_stamp_scanned_identity(model):
     assert smap["shape_uid"] == 7 and smap["shape_name"] == "TextBox 3"
 
     model.set_skip(1, 0, True)  # skip targets a specific shape too
-    assert model.shape_map(1, 0) == {"skip": True, "shape_uid": 7,
-                                     "shape_name": "TextBox 3"}
+    smap = model.shape_map(1, 0)
+    assert smap["skip"] is True
+    assert smap["shape_uid"] == 7 and smap["shape_name"] == "TextBox 3"
+    assert smap["image_path"] == "rel.png"  # skip no longer discards
 
 
 def test_shape_without_uid_stays_unstamped(model):

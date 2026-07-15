@@ -4,7 +4,7 @@
 
 ## Current phase
 
-Phase 8 — Demo readiness (complete): portable release download + client-data hygiene scrub
+Phase 9 — Queue burn-down (complete): saved-query resolver fidelity, mapper roadmap Phase 5 closed, template-first Phase A shipped
 
 The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
@@ -60,12 +60,16 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - **Portable download**: the Release workflow attaches `IngestionEngine-<version>-portable-win64.zip` (source + `wheelhouse/` of Windows wheels for all runtime deps, built for Python 3.12; pywin32 fetched explicitly since its win32 marker is false on the Linux runner). Launcher precedence: `app\vendor\` present → skip installs entirely (fixed: the check previously ignored vendor and attempted pip offline); `wheelhouse\` present → offline install with internet fallback; else internet as before. Release notes get a "which download" footer. All four distribution shapes documented in TESTING_AND_RELEASE.md.
   - **Client-data hygiene scrub** (owner-approved, pre-demo): real advertiser names in examples/tests replaced with fictional ones ("Acme Appliance Co", "Acme Motors"); real-but-unattributed vendor-audit figures in STATUS/CHANGELOG/test docstrings/kpi comments genericized; stand-in template's example delivery figures changed. Audit found no client exports, credentials, paths, or personal data anywhere tracked. NOTE: previously published GitHub release notes (v1.29.0) still contain two unattributed figures — editable on GitHub if desired; not possible from a remote session.
   - 297 tests pass. Released as v1.31.0.
+- Phase 9 (2026-07-15) — Queue burn-down:
+  - **Resolver fidelity**: `build_pivot` moved to `engine/pivot.py` (tk-free; `mapper.query_builder` re-exports it); `resolve_query` detects builder-query keys (`campaigns`/`sources`/`values`/`top_n`) and re-resolves through the same pivot + `pivot_total` the builder displayed at apply time. Plain metric/breakdown/filter/agg queries keep their exact historical path.
+  - **Mapper roadmap Phase 5 closed** (see roadmap doc): Skip preserves assignments (owner decision — flag on top of the mapping, nothing discarded); template-selector preview selection debounced 250 ms; client-wizard drag-select dead code removed; all-caps case-forcing KEPT by owner decision (values match the deck's case); unused `PPTXWizard.image_paths` removed.
+  - **Template-first Phase A shipped**: `app/engine/template_ir/` — stdlib-dataclass JSON schema, ingest (verbatim shape XML + image assets keyed by rId + persistent `shape_uid` identity), build (new deck from verbatim copies, images re-linked via `get_or_add_image_part`, charts skipped + reported for Phase C). Round-trip invariant locked in `tests/test_template_ir.py`; store defaults to `workspace/template_store/` (gitignored). Open questions answered PROVISIONALLY (pixel-exact / static preview / workspace store / pivot-merge deferred) — owner to confirm, recorded in the review doc.
+  - 306 tests pass (9 new). Released as v1.32.0.
 
 ## Next up
 
 1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, the refactored mapper, the Phase-4 drift drill (id parity between python-pptx/COM scans, live cut-paste retargeting, legacy-mapping regression), and now batch 3: rename the project folder → export lands in the renamed folder's `output/`; multi-client export launches ONE Excel process; status line narrates stages; review shows no Reach/Frequency and formats counts/%/$ consistently. Per `documentation/TESTING_AND_RELEASE.md` and the checklist in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
-2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce [thumbnail exports are now serialized — Phase 7 — but the selection debounce is still open], client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
-3. **Template-first mapper (accepted proposal, not scheduled)** — ingest→classify→map→build rework of the mapper around a JSON IR with named slots. Before starting: read `documentation/proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md` AND `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md` (critique, required design changes — static shapes copied as verbatim XML, uid-based slot reconciliation — phasing A–D, and the reuse map onto existing modules). Prerequisite from Noticed: extend `resolve_query()` to honor builder-query keys.
+2. **Template-first mapper Phase B** — classification heuristics + review GUI + slot registry + mapping GUI + dynamic text build (Phase A shipped in v1.32.0). Before starting: read `documentation/proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md` AND `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md` (Phase A completion note, provisional owner answers — get the pivot-merge question confirmed before freezing the mapping schema).
 
 ## Decisions log
 
@@ -94,7 +98,11 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-14 — Multi-line replace semantics: first target line receives the value, remaining target lines are cleared; single-line targets keep the exact previous matching (plus a trimmed retry for selections with stray whitespace).
 - 2026-07-14 — **v1.30.0** — Windows debugging batch 4 (multi-line fills + COM lifecycle); releases on merge.
 - 2026-07-15 — Test/example client names must be OBVIOUSLY fictional ("Acme …" family) — real advertiser names from the inherited fixtures were scrubbed pre-demo; keep it that way in new tests and docs.
-- 2026-07-15 — **v1.31.0** — portable release download + data-hygiene scrub; releases on merge.
+- 2026-07-15 — **v1.31.0 released** (PR #15) — portable zip verified attached on first workflow run.
+- 2026-07-15 — All-caps case-forcing KEPT (owner decision, roadmap Phase 5): inserted values match the deck's case ("CLIENT NAME" → "ACME HOLDING"); Skip now PRESERVES assignments (owner decision, replaces the pre-model discard).
+- 2026-07-15 — Builder queries re-resolve through `engine/pivot.py::build_pivot` (moved from mapper/ so the engine stays tk-free); a saved query's value is defined as `pivot_total` of the same pivot the builder displayed.
+- 2026-07-15 — Template-first Phase A open questions answered PROVISIONALLY (pixel-exact fidelity / static preview / `workspace/template_store/` / pivot-merge deferred to Phase B) — the AskUserQuestion round was cut off; owner to confirm in the review doc.
+- 2026-07-15 — **v1.32.0** — resolver fidelity + mapper Phase 5 closure + template-first Phase A; releases on merge.
 - 2026-07-15 — **Template-first mapper architecture accepted as the v2 direction** (owner proposal): ingest client decks into a JSON IR with named slots, build new decks instead of editing in place. Documented in `documentation/proposals/` + reviewed in `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md`; key review amendments: static shapes are copied as verbatim XML (never rebuilt from schema), charts are their own phase via chart-part cloning, slots reconcile across re-ingests by shape uid, template store lives under `workspace/` (data hygiene). Current mapper remains the production path until template-first survives a real month-end cycle. Not scheduled; doc-only — no release.
 
 ## Noticed (not yet acted on)
@@ -105,9 +113,6 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - `tests/test_parsers.py::test_real_input_files` scans root `input/` for optional HTML samples — always empty in the repo/CI, so it's effectively a no-op there.
 - Text assignments mapped onto shapes without a text frame are silently unreported by `FillReport` (locked as a characterization test); decide whether to surface it.
 - Two `tests/test_ui_helpers.py` DPI tests import `ui.utils` and therefore need a Python built with tkinter (GitHub Actions setup-python and standard Windows installs have it; minimal Linux builds may not).
-- Toggling a shape's Skip checkbox replaces its whole mapping and silently discards existing assignments (pre-model behavior, deliberately preserved and locked by `test_set_skip_replaces_shape_mapping`). Decide in mapper Phase 5 whether skip should preserve assignments.
-- `PPTXWizard.image_paths` is an unused leftover attribute.
-- Query-builder queries carry `campaigns`/`sources`/`values`/`top_n` keys, but `engine.query_resolver.resolve_query()` only honors `metric`/`breakdown`/`filter`/`agg` — a re-resolved builder query (e.g. review auto-fill in a later session) can differ from the pivot total shown at apply time. In-session fills use the cached value and are correct. Needs a resolver extension or query translation.
 - Opening the mapper computes `get_available_metrics()` on the Tk thread — noticeable but tolerable on large imports; move behind `run_in_background` if it becomes a complaint.
 - The mapper catalog still exposes `Total Reach` / `Avg Frequency` keys carrying the non-deduplicated values (renaming them would break saved template mappings). Decide whether deck-side labels should match the review screen's non-dedup labels, or whether those catalog entries should be dropped in favor of manual vendor numbers.
 - If any vendor export contains an order-level (deduplicated) reach/frequency summary row, the KPI engine could prefer it over the campaign sum — needs a sample export to confirm the shape.

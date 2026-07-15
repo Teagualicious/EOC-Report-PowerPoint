@@ -130,6 +130,13 @@ def resolve_query(query, client_data, client_name="", start_date="", end_date=""
     breakdown = query.get("breakdown", "all")
     filt = query.get("filter", "all")
     agg = query.get("agg", "sum")
+    # Queries saved by the Advanced Query Builder carry the full selection
+    # (campaigns/sources/values/top_n) — previously ignored here, so a
+    # refill in a later session could diverge from the value shown at
+    # apply time. Detected by key presence so plain metric/breakdown/
+    # filter/agg queries keep their exact historical resolution path.
+    is_builder_query = any(k in query for k in
+                           ("campaigns", "sources", "values", "top_n"))
 
     # Collect data into DataFrame
     rows = []
@@ -156,6 +163,18 @@ def resolve_query(query, client_data, client_name="", start_date="", end_date=""
         return 0
 
     df = pd.DataFrame(rows)
+
+    if is_builder_query:
+        # Re-resolve through the SAME pivot the builder previewed so the
+        # value always matches what the user saw when they applied it.
+        from engine.pivot import build_pivot, pivot_total
+        pivot, _note = build_pivot(
+            df, metric, agg, str(query.get("top_n", "all") or "all"),
+            query.get("campaigns") or [], query.get("sources") or [],
+            query.get("values") or [])
+        if pivot is None or pivot.empty:
+            return 0
+        return pivot_total(pivot)
 
     # Filter to requested metric
     df = df[df["metric"] == metric]

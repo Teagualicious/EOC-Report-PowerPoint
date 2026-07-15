@@ -42,7 +42,6 @@ class PPTXWizard(SidebarMixin, SlideViewMixin):
         # preview re-render from it after every mutation (see _on_model_change)
         self.model = MappingModel()
         self.selected_metric = None
-        self.image_paths = {}
         self.original_texts = {}
         self._pending_query = None
         self._pending_image = None
