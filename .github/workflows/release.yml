@@ -51,6 +51,11 @@ jobs:
         run: |
           awk '/^## /{n++} n==1' documentation/CHANGELOG.md > release_notes.md
           test -s release_notes.md || echo "See documentation/CHANGELOG.md." > release_notes.md
+          cat >> release_notes.md <<EOF
+
+          ---
+          **Which download?** Grab \`IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip\` below — extract anywhere and double-click \`Start Ingestion Engine.bat\`. The first launch sets up its bundled packages automatically (offline, under a minute; requires Python 3.12 from python.org). The plain "Source code" zips work too, but install packages from the internet on first run.
+          EOF
 
       - name: Create tag and release
         if: steps.released.outputs.exists == 'false'

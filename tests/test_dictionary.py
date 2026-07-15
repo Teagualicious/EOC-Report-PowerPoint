@@ -85,9 +85,9 @@ class TestClassifyColumns:
 class TestRowBuilders:
     def test_extract_row_context(self):
         ctx = extract_row_context(
-            {"Order": " Liberty Ford - Used VLA ", "Impressions": 45230},
+            {"Order": " Acme Motors - Used VLA ", "Impressions": 45230},
             {"campaign_name": "Order"})
-        assert ctx == {"campaign_name": "Liberty Ford - Used VLA"}
+        assert ctx == {"campaign_name": "Acme Motors - Used VLA"}
 
     def test_extract_row_context_missing(self):
         ctx = extract_row_context({}, {"campaign_name": "Order"})

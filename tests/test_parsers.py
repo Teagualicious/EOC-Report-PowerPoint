@@ -11,16 +11,16 @@ class TestCSVParser:
     def test_campaign_level_parse(self, sample_csv):
         result = CSVParser(sample_csv).parse()
         cm = result["campaign_metrics"]
-        assert cm["Famous Tate - Streaming TV|Impressions"]["value"] == 1204556
-        assert cm["Famous Tate - Streaming TV|Cost"]["value"] == 8400.50
+        assert cm["Acme Appliance Co - Streaming TV|Impressions"]["value"] == 1204556
+        assert cm["Acme Appliance Co - Streaming TV|Cost"]["value"] == 8400.50
         # "100% Completions" resolves through the shipped dictionary
-        assert cm["Famous Tate - Streaming TV|100% Completions"]["value"] == 1100203
-        assert result["campaign_name"] == "Famous Tate - Streaming TV"
+        assert cm["Acme Appliance Co - Streaming TV|100% Completions"]["value"] == 1100203
+        assert result["campaign_name"] == "Acme Appliance Co - Streaming TV"
         assert result["level_data"] == []
 
     def test_number_cleaning(self, sample_csv):
         result = CSVParser(sample_csv).parse()
-        val = result["campaign_metrics"]["Famous Tate - Display|Impressions"]["value"]
+        val = result["campaign_metrics"]["Acme Appliance Co - Display|Impressions"]["value"]
         assert isinstance(val, int) and val == 88450
 
     def test_empty_file(self, tmp_path):

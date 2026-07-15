@@ -156,8 +156,8 @@ _PERCENT_TOKENS = ("rate", "percent", "pct", "share", "ctr", "vcr")
 def format_kpi_value(metric, value):
     """Format a KPI number by what it is, consistently everywhere it shows.
 
-    Counts tolerate float noise from pandas sums (3,176,056.0000001 renders
-    as 3,176,056, never 3,176,056.00); genuine non-integer ratios keep two
+    Counts tolerate float noise from pandas sums (1,234,567.0000001 renders
+    as 1,234,567, never 1,234,567.00); genuine non-integer ratios keep two
     decimals. Non-numeric values pass through as text.
     """
     try:

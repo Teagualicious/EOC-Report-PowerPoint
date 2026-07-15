@@ -97,7 +97,7 @@ def _format_date(date_str, target_style):
 
 
 def _split_camel_case(text):
-    """Split CamelCase into separate words. 'FamousTate' → 'Famous Tate'."""
+    """Split CamelCase into separate words. 'AcmeAppliance' → 'Acme Appliance'."""
     # Insert space before uppercase letters that follow lowercase
     result = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
     # Insert space before uppercase letters that are followed by lowercase (for acronyms)

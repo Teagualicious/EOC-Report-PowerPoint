@@ -103,8 +103,8 @@ def sample_csv(tmp_path):
     path = tmp_path / "audiencetrak_sample.csv"
     path.write_text(textwrap.dedent("""\
         Campaign,Impressions,Clicks,100% Completions,Spend
-        Famous Tate - Streaming TV,"1,204,556",3421,"1,100,203","$8,400.50"
-        Famous Tate - Display,88450,1205,0,"$1,200.00"
+        Acme Appliance Co - Streaming TV,"1,204,556",3421,"1,100,203","$8,400.50"
+        Acme Appliance Co - Display,88450,1205,0,"$1,200.00"
         """), encoding="utf-8")
     return str(path)
 
@@ -172,7 +172,7 @@ def client_data():
     return [
         {
             "source_file": "architect.xlsx",
-            "client_name": "Famous Tate",
+            "client_name": "Acme Appliance Co",
             "campaign_name": "Campaign A",
             "campaign_type": "",
             "source_platform": "Architect",
@@ -196,7 +196,7 @@ def client_data():
         },
         {
             "source_file": "audiencetrak.csv",
-            "client_name": "Famous Tate",
+            "client_name": "Acme Appliance Co",
             "campaign_name": "Campaign B",
             "campaign_type": "",
             "source_platform": "AudienceTrak",

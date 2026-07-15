@@ -50,17 +50,17 @@ def test_full_pipeline(tmp_path, sample_xlsx, sample_csv):
         for ld in data.get("level_data", []):
             if ld.get("_campaign"): campaigns.add(ld["_campaign"])
     assert "Campaign A" in campaigns
-    assert "Famous Tate - Streaming TV" in campaigns
+    assert "Acme Appliance Co - Streaming TV" in campaigns
 
     selected = ["Campaign A", "Campaign B"]
     client_data = pipeline.filter_data_by_campaigns(all_parsed, selected)
     for data in client_data:
-        data["client_name"] = "Famous Tate"
+        data["client_name"] = "Acme Appliance Co"
         data["start_date"] = "2026-05-01"
         data["end_date"] = "2026-05-31"
 
     # 4. Export Excel
-    out = str(tmp_path / "Famous_Tate_unified_report.xlsx")
+    out = str(tmp_path / "Acme_Appliance_unified_report.xlsx")
     xw.write_to_excel(client_data, out, inject_vba=False)
 
     # 5. Assert on workbook contents
@@ -83,7 +83,7 @@ def test_full_pipeline(tmp_path, sample_xlsx, sample_csv):
     # Zip data from the second sheet
     assert by_key[("Campaign A", "zip:33607", "Impressions")] == 22000
     # Client name normalized onto every row
-    assert all(r[idx["client"]] == "Famous Tate" for r in rows)
+    assert all(r[idx["client"]] == "Acme Appliance Co" for r in rows)
 
 
 def test_pptx_metrics_from_pipeline(sample_xlsx):
@@ -95,9 +95,9 @@ def test_pptx_metrics_from_pipeline(sample_xlsx):
     parsed = ExcelParser(sample_xlsx).parse()
 
     metrics, structured = catalog.get_available_metrics(
-        [parsed], "Famous Tate", "2026-05-01", "2026-05-31")
+        [parsed], "Acme Appliance Co", "2026-05-01", "2026-05-31")
 
-    assert metrics["__client_name__"] == "Famous Tate"
+    assert metrics["__client_name__"] == "Acme Appliance Co"
     assert metrics["__start_month__"] == "May"
     assert metrics["__year__"] == "2026"
     # Impressions totals: device 80,000 vs zip 80,000 (equal) — total exists
