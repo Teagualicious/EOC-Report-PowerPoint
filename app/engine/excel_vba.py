@@ -230,27 +230,83 @@ def _compose_calendar_form():
     return src
 
 
-def inject_search_vba(xlsx_path):
+class ExcelSession:
+    """One hidden Excel process reused across a batch of exports.
+
+    Launching Excel is the dominant fixed cost of VBA injection (several
+    seconds per start); a multi-client export pays it once instead of once
+    per client. Where COM is unavailable (non-Windows, pywin32 missing,
+    Excel not installed) ``app`` stays None and injection falls back to
+    its own per-call handling. Use as a context manager on ONE thread —
+    COM apartments are thread-bound.
+    """
+
+    def __init__(self):
+        self.app = None
+        self._com_initialized = False
+
+    def __enter__(self):
+        try:
+            import pythoncom
+            import win32com.client
+        except ImportError:
+            return self
+        try:
+            pythoncom.CoInitialize()
+            self._com_initialized = True
+            self.app = win32com.client.DispatchEx("Excel.Application")
+            self.app.Visible = False
+            self.app.DisplayAlerts = False
+        except Exception:
+            logger.warning("Shared Excel session unavailable", exc_info=True)
+            self.app = None
+        return self
+
+    def __exit__(self, *exc_info):
+        try:
+            if self.app is not None:
+                self.app.Quit()
+        except Exception:
+            logger.debug("Excel session quit failed", exc_info=True)
+        self.app = None
+        if self._com_initialized:
+            try:
+                import pythoncom
+                pythoncom.CoUninitialize()
+            except Exception:
+                logger.debug("CoUninitialize failed", exc_info=True)
+        return False
+
+
+def inject_search_vba(xlsx_path, app=None):
     """Inject the search VBA and save as .xlsm.
 
     Returns (final_path, error_reason). error_reason is None on success;
     on failure the original xlsx is untouched and reason explains why.
+
+    app: an already-open Excel COM Application to reuse (see ExcelSession);
+    the caller keeps ownership. When None, a private instance is launched
+    and quit for this call.
     """
-    try:
-        import pythoncom
-        import win32com.client
-    except ImportError:
-        return xlsx_path, ("pywin32 not available — workbook saved without "
-                           "the interactive search (data intact).")
+    owns_app = app is None
+    if owns_app:
+        try:
+            import pythoncom
+            import win32com.client
+        except ImportError:
+            return xlsx_path, ("pywin32 not available — workbook saved without "
+                               "the interactive search (data intact).")
 
     xlsm_path = os.path.splitext(xlsx_path)[0] + ".xlsm"
-    app = None
+    com_initialized = False
     wb = None
     try:
-        pythoncom.CoInitialize()
-        app = win32com.client.DispatchEx("Excel.Application")
-        app.Visible = False
-        app.DisplayAlerts = False
+        if owns_app:
+            pythoncom.CoInitialize()
+            com_initialized = True
+            app = win32com.client.DispatchEx("Excel.Application")
+            app.Visible = False
+            app.DisplayAlerts = False
         wb = app.Workbooks.Open(os.path.abspath(xlsx_path))
 
         try:
@@ -346,12 +402,14 @@ def inject_search_vba(xlsx_path):
                 wb.Close(SaveChanges=False)
         except Exception:
             pass
-        try:
-            if app is not None:
-                app.Quit()
-        except Exception:
-            pass
-        try:
-            pythoncom.CoUninitialize()
-        except Exception:
-            pass
+        if owns_app:
+            try:
+                if app is not None:
+                    app.Quit()
+            except Exception:
+                pass
+            if com_initialized:
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass

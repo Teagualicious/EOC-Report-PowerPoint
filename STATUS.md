@@ -4,7 +4,7 @@
 
 ## Current phase
 
-Phase 5 — Mapper roadmap Phase 4, stable shape identity (complete; Windows drift drill pending)
+Phase 6 — Windows debugging batch 3 (complete): dynamic output folder, faster export stage with live progress, review-KPI cleanup
 
 The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
@@ -46,10 +46,16 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - Shared pure resolver `app/engine/shape_identity.py` used by `pptx_fill` and new `PPTXLivePreview._resolve_shape` (fast path = one COM Id read; drift retargets by id or skips — no more "warn but write anyway"). Deleted mapped shapes surface via `FillReport.missing_shapes` in the With-Gaps dialog.
   - Tests: `test_scan_and_fill_agree_on_shape_identity` deliberately replaced by reorder/insert/delete drift e2e tests; resolver units (`test_shape_identity.py`); COM stub tests; model stamping tests. 279 pass (17 new); all pre-Phase-4 tests pass unchanged (backward-compat gate).
   - Prompted by the question "would pptxgenjs fix the mapper?" — answered in the plan: pptxgenjs is generation-only (cannot open/edit existing templates) and addresses none of the real issue classes; this refactor is the actual fix.
+- Phase 6 (2026-07-14) — Windows debugging batch 3 (from on-site photos):
+  - **Output folder is dynamic again.** Saving Settings pinned the absolute default path; after a project-folder rename, exports recreated the old folder (`…-1.27.0\output`) and wrote there. Settings now never persist the default (unset key = follow the project), and `_normalize_settings` falls back to the current `output/` when a stored default-shaped path (basename `output`) no longer exists. Existing custom folders — including ones literally named `output` that still exist — are preserved.
+  - **Export stage (client selection → review) sped up + live progress.** One shared hidden Excel process per batch (`engine.excel_vba.ExcelSession`; `inject_search_vba(app=)` / `write_to_excel(excel_app=)`) instead of a full Excel launch per client; Unified Data writer switched from `iterrows` to `itertuples` (row-Series construction was the slow loop). `run_in_background` gained an ordered `on_progress` channel; the status line now narrates each stage per client.
+  - **Reach/Frequency hardcoded out of review KPIs** (totals AND per-campaign detail) until real household-level dedup data/formulas exist — supersedes the 2026-07-13 relabel-and-flag rule. Values remain in exported workbook rows and the Excel search.
+  - **Consistent KPI number formatting** via `engine.kpi.format_kpi_value` used by cards, campaign summaries, and detail rows: counts render whole with commas (float noise tolerated), rates get `%`, money gets `$`.
+  - 291 tests pass (12 net new this phase).
 
 ## Next up
 
-1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, the refactored mapper, and now the Phase-4 drift drill (id parity between python-pptx/COM scans, live cut-paste retargeting, legacy-mapping regression) — per `documentation/TESTING_AND_RELEASE.md` and the checklist in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
+1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, the refactored mapper, the Phase-4 drift drill (id parity between python-pptx/COM scans, live cut-paste retargeting, legacy-mapping regression), and now batch 3: rename the project folder → export lands in the renamed folder's `output/`; multi-client export launches ONE Excel process; status line narrates stages; review shows no Reach/Frequency and formats counts/%/$ consistently. Per `documentation/TESTING_AND_RELEASE.md` and the checklist in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
 2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce, client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
 
 ## Decisions log
@@ -71,7 +77,10 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-13 — **v1.27.0 released** (PR #11, typed-pivot search contract + gated KPI cards).
 - 2026-07-14 — pptxgenjs rejected as a mapper replacement — it only generates new decks (no API to open/edit existing .pptx), while the mapper's job is filling existing client templates; the real fix for wrong-shape assignments is stable shape identity (mapper roadmap Phase 4), implemented instead.
 - 2026-07-14 — Mapping entries with stored identity that matches nothing in the deck are **skipped and reported** (`FillReport.missing_shapes`), never resolved positionally — writing into the positional slot's new occupant IS the wrong-shape bug. Legacy entries without stored identity keep positional resolution bit-for-bit. Duplicate shape names never match (no guessing).
-- 2026-07-14 — **v1.28.0** — stable shape identity (mapper roadmap Phase 4); releases on merge via the VERSION-file workflow.
+- 2026-07-14 — **v1.28.0 released** (PR #12, stable shape identity / mapper roadmap Phase 4) — merge verified complete, release auto-published by the VERSION-file workflow.
+- 2026-07-14 — Reach/Frequency **omitted** from review KPIs (supersedes the relabel-and-flag rule): even honestly-labeled non-dedup values invited bad comparisons against vendor dashboards. They return when household-level data/formulas exist; workbook rows keep the raw values.
+- 2026-07-14 — The default output folder is never persisted in settings.json (unset key = follow the project folder); only user-chosen custom folders are stored. Stale default-shaped paths from renamed/moved projects fall back on load.
+- 2026-07-14 — **v1.29.0** — Windows debugging batch 3; releases on merge via the VERSION-file workflow.
 
 ## Noticed (not yet acted on)
 

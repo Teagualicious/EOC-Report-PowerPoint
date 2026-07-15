@@ -79,11 +79,13 @@ class TestCompletionRate:
         assert details["X"]["Completion Rate"] == 85.5
 
 
-class TestNonDedupTotals:
+class TestNonDedupOmission:
     """Cross-campaign Reach/Frequency cannot be deduplicated from campaign
     aggregates (a real order read 1,039,763 vs the vendor's 325,644).
-    Approved 2026-07-13: totals stay visible but honestly labeled + flagged;
-    per-campaign values are vendor-computed and keep their plain names."""
+    Approved 2026-07-14 (supersedes the 2026-07-13 relabel-and-flag rule):
+    OMIT them from review KPIs entirely — totals AND per-campaign detail —
+    until household-level data/formulas exist. The raw values still land in
+    the exported workbook rows."""
 
     @staticmethod
     def _two_campaign_reach():
@@ -97,22 +99,60 @@ class TestNonDedupTotals:
                                 "campaign_name": "A"},
                 "B|Frequency": {"value": 2.5, "universal_name": "Frequency",
                                 "campaign_name": "B"},
+                "A|Impressions": {"value": 1000,
+                                  "universal_name": "Impressions",
+                                  "campaign_name": "A"},
             },
             "level_data": [],
         }]
 
-    def test_totals_are_relabeled_and_flagged(self):
-        totals, details, flags = kpi.compute_kpis(self._two_campaign_reach())
+    def test_reach_and_frequency_omitted_everywhere(self):
+        totals, details, _ = kpi.compute_kpis(self._two_campaign_reach())
 
-        assert "Reach" not in totals
-        assert "Frequency" not in totals
-        assert totals["Combined Reach (not deduplicated)"] == 1000
-        assert totals["Avg Campaign Frequency"] == 2.0
-        assert any("deduplication" in str(f) for f in flags)
-        assert any("per-campaign" in str(f) for f in flags)
+        assert not any("Reach" in k for k in totals)
+        assert not any("Frequency" in k for k in totals)
+        assert "Reach" not in details["A"]
+        assert "Reach" not in details["B"]
+        assert "Frequency" not in details["A"]
+        assert "Frequency" not in details["B"]
 
-    def test_per_campaign_values_keep_plain_names(self):
-        _, details, _ = kpi.compute_kpis(self._two_campaign_reach())
+    def test_other_metrics_unaffected(self):
+        totals, details, _ = kpi.compute_kpis(self._two_campaign_reach())
 
-        assert details["A"]["Reach"] == 600
-        assert details["B"]["Frequency"] == 2.5
+        assert totals["Impressions"] == 1000
+        assert details["A"]["Impressions"] == 1000
+
+
+class TestFormatKpiValue:
+    """One formatter for every review display (cards, campaign summaries,
+    detail rows) — the cards previously showed 3,176,056.00 beside
+    3,453,076, and a bare 91.98 for a rate."""
+
+    def test_counts_render_whole_with_commas(self):
+        assert kpi.format_kpi_value("Impressions", 3453076) == "3,453,076"
+        assert kpi.format_kpi_value("Completions", 3176056.00) == "3,176,056"
+
+    def test_float_noise_from_sums_is_not_decimals(self):
+        assert kpi.format_kpi_value("Completions",
+                                    3176056.0000001) == "3,176,056"
+
+    def test_rates_get_percent_sign(self):
+        assert kpi.format_kpi_value("Completion Rate", 91.98) == "91.98%"
+        assert kpi.format_kpi_value("CTR", 0.42) == "0.42%"
+        assert kpi.format_kpi_value("Impression Share", 55.5) == "55.50%"
+
+    def test_money_gets_dollar_sign(self):
+        assert kpi.format_kpi_value("Cost", 1234.5) == "$1,234.50"
+        assert kpi.format_kpi_value("CPM", 12.5) == "$12.50"
+        assert kpi.format_kpi_value("Budget Spend", 99) == "$99.00"
+
+    def test_genuine_ratios_keep_two_decimals(self):
+        assert kpi.format_kpi_value("Avg Session Depth", 2.47) == "2.47"
+
+    def test_numpy_and_text_values_are_safe(self):
+        import numpy as np
+        assert kpi.format_kpi_value("Impressions",
+                                    np.int64(1204556)) == "1,204,556"
+        assert kpi.format_kpi_value("Impressions",
+                                    np.float64(1204556.0)) == "1,204,556"
+        assert kpi.format_kpi_value("Notes", "n/a") == "n/a"

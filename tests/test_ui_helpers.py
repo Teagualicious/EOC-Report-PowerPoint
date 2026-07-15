@@ -1,6 +1,59 @@
-"""Regression tests for Windows DPI sizing and template preview fallbacks."""
+"""Regression tests for Windows DPI sizing, template preview fallbacks,
+and the background-work helper."""
 
+import time
 from pathlib import Path
+
+
+class _FakeRoot:
+    """Minimal root for run_in_background: collects after() callbacks so the
+    test drives the poll loop synchronously."""
+
+    def __init__(self):
+        self.pending = []
+
+    def after(self, _ms, fn):
+        self.pending.append(fn)
+
+    def _drive(self, done, timeout=5.0):
+        deadline = time.time() + timeout
+        while not done and time.time() < deadline:
+            if self.pending:
+                self.pending.pop(0)()
+            else:
+                time.sleep(0.01)
+
+
+def test_run_in_background_without_progress_keeps_old_contract():
+    from ui import utils
+
+    root = _FakeRoot()
+    done = []
+    utils.run_in_background(root, lambda: 41 + 1, done.append,
+                            lambda exc: done.append(exc))
+    root._drive(done)
+
+    assert done == [42]
+
+
+def test_run_in_background_delivers_progress_in_order_before_result():
+    from ui import utils
+
+    root = _FakeRoot()
+    seen, done = [], []
+
+    def work(progress):
+        progress("writing workbook…")
+        progress("computing KPIs…")
+        return "result"
+
+    utils.run_in_background(root, work, done.append,
+                            lambda exc: done.append(exc),
+                            on_progress=seen.append)
+    root._drive(done)
+
+    assert done == ["result"]
+    assert seen == ["writing workbook…", "computing KPIs…"]
 
 
 def test_fit_window_scales_geometry_for_windows_dpi(monkeypatch):

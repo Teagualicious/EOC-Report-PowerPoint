@@ -90,36 +90,26 @@ def compute_kpis(client_data):
                     camp_avg[camp_avg["metric"] == metric]["value"].mean(), 2)
 
         _derive_completion_rate(kpi_totals, campaign_details)
-        _relabel_non_dedup_totals(kpi_totals, flags)
+        _drop_non_dedup_metrics(kpi_totals, campaign_details)
 
     return kpi_totals, campaign_details, flags
 
 
 # Cross-campaign Reach/Frequency need household-level deduplication only
 # the vendor can do (campaign aggregates carry no overlap information, so a
-# 3x gap against vendor dashboards is possible). Approved 2026-07-13: keep
-# the values but label them honestly and flag the caveat. Per-campaign
-# values in campaign_details are vendor-computed and stay as-is.
-_NON_DEDUP_RELABELS = {
-    "Reach": "Combined Reach (not deduplicated)",
-    "Frequency": "Avg Campaign Frequency",
-}
-_NON_DEDUP_FLAGS = {
-    "Reach": ("Reach total is campaign reach summed WITHOUT household "
-              "deduplication — the vendor's true order reach will be lower. "
-              "Take order-level reach from the vendor dashboard."),
-    "Frequency": ("Frequency total is the average of per-campaign "
-                  "frequencies — the vendor's order frequency (impressions ÷ "
-                  "deduplicated reach) will be higher. Take order-level "
-                  "frequency from the vendor dashboard."),
-}
+# 3x gap against vendor dashboards is possible). Approved 2026-07-14
+# (supersedes the 2026-07-13 relabel-and-flag rule): OMIT them from the
+# review KPIs entirely — totals AND per-campaign detail — until real
+# household-level data/formulas are available. The raw values still land
+# in the exported workbook rows; only the review display is affected.
+_NON_DEDUP_METRICS = ("Reach", "Frequency")
 
 
-def _relabel_non_dedup_totals(kpi_totals, flags):
-    for metric, label in _NON_DEDUP_RELABELS.items():
-        if metric in kpi_totals:
-            kpi_totals[label] = kpi_totals.pop(metric)
-            flags.append(_NON_DEDUP_FLAGS[metric])
+def _drop_non_dedup_metrics(kpi_totals, campaign_details):
+    for metric in _NON_DEDUP_METRICS:
+        kpi_totals.pop(metric, None)
+        for det in campaign_details.values():
+            det.pop(metric, None)
 
 
 _RATE_NAMES = ("Completion Rate", "Completion Percent")
@@ -153,3 +143,32 @@ def _derive_completion_rate(kpi_totals, campaign_details):
             r = rate_from(det)
             if r is not None:
                 det[target] = r
+
+
+# ── Display formatting ────────────────────────────────────────────────────────
+# Name-based so any new platform metric renders sensibly with no config:
+# money gets $, rates get %, counts get whole comma-grouped numbers.
+_CURRENCY_EXACT = {"cost", "cpm", "cpc", "cpv"}
+_CURRENCY_TOKENS = ("cost", "spend")
+_PERCENT_TOKENS = ("rate", "percent", "pct", "share", "ctr", "vcr")
+
+
+def format_kpi_value(metric, value):
+    """Format a KPI number by what it is, consistently everywhere it shows.
+
+    Counts tolerate float noise from pandas sums (3,176,056.0000001 renders
+    as 3,176,056, never 3,176,056.00); genuine non-integer ratios keep two
+    decimals. Non-numeric values pass through as text.
+    """
+    try:
+        value = float(value)  # accepts numpy ints/floats too
+    except (TypeError, ValueError):
+        return str(value)
+    name = str(metric).lower()
+    if name in _CURRENCY_EXACT or any(t in name for t in _CURRENCY_TOKENS):
+        return f"${value:,.2f}"
+    if any(t in name for t in _PERCENT_TOKENS):
+        return f"{value:,.2f}%"
+    if abs(value - round(value)) < 0.005:
+        return f"{round(value):,}"
+    return f"{value:,.2f}"
