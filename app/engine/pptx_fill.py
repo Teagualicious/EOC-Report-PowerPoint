@@ -2,8 +2,11 @@
 
 import logging
 import os
+import re
+from copy import deepcopy
 
 from pptx import Presentation
+from pptx.oxml.ns import qn
 
 from config.paths import APP_ROOT, WORKSPACE_DIR
 from engine.pptx_formats import _coerce_number, _format_value, format_with_details
@@ -164,15 +167,19 @@ def fill_template_report(template_path, output_path, mapping, metric_values):
                     display = _format_value(value, fmt, fmt_context)
 
                 if shape.has_text_frame:
-                    if replace_text and replace_text not in existing_text:
-                        # Placeholder no longer exists in the template — the
-                        # replace below is a silent no-op. Track it: this is
-                        # the #1 "my number didn't show up" failure mode.
+                    # Report from the replace's ACTUAL outcome. The old check
+                    # matched replace_text against the frame's full text,
+                    # which contains break characters (\n between paragraphs,
+                    # \v for soft line breaks) that the runs being edited
+                    # never do — multi-line targets were recorded as filled
+                    # while the replace silently did nothing. This is the #1
+                    # "my number didn't show up" failure mode.
+                    if _replace_in_text_frame(shape.text_frame, display,
+                                              replace_text):
+                        report.note_filled()
+                    else:
                         report.note_unmatched_placeholder(metric_name,
                                                           replace_text)
-                    else:
-                        report.note_filled()
-                    _replace_in_text_frame(shape.text_frame, display, replace_text)
 
     prs.save(output_path)
     logger.info("PowerPoint filled: %s | %s | ok=%s", output_path,
@@ -184,16 +191,41 @@ def _replace_in_text_frame(text_frame, new_text, replace_text=None):
     """Replace text in a text frame while preserving all run-level formatting.
 
     If replace_text is specified, only that substring is replaced (partial).
-    If replace_text is None, the entire text content is replaced.
+    A multi-line target — the UI preview joins paragraphs with '\\n' and
+    PowerPoint soft line breaks surface as '\\v', neither of which ever
+    appears in the run text being searched — is matched line by line: the
+    first target line receives the new text, the remaining target lines
+    are cleared. If replace_text is None, the entire text content is
+    replaced (an empty frame gets the text in its first paragraph).
+
+    Returns True when something was written, so callers report unmatched
+    placeholders from the actual outcome instead of guessing.
     """
+    wrote = False
     if replace_text:
-        # Partial replacement — find the target text across runs
-        for para in text_frame.paragraphs:
-            full_text = "".join(run.text for run in para.runs)
-            if replace_text not in full_text:
-                continue
-            _replace_across_runs(para, replace_text, new_text)
-            break  # Only replace first occurrence
+        lines = [ln.strip() for ln in re.split("[\r\n\v]+", replace_text)]
+        lines = [ln for ln in lines if ln]
+        if len(lines) <= 1:
+            targets = [replace_text]
+            if lines and lines[0] != replace_text:
+                # Selection carried stray whitespace the runs don't have —
+                # retry with the trimmed line before giving up
+                targets.append(lines[0])
+        else:
+            targets = lines
+        for target in targets:
+            replacement = "" if wrote else new_text
+            for para in text_frame.paragraphs:
+                full_text = "".join(run.text for run in para.runs)
+                if target not in full_text:
+                    continue
+                _replace_across_runs(para, target, replacement)
+                if replacement and "\n" in replacement:
+                    _explode_newlines(para)
+                wrote = True
+                break  # Only replace the first occurrence of each target
+            if wrote and len(lines) <= 1:
+                break  # single-line target placed — don't run the retry
     else:
         # Full replacement — replace text in the first paragraph that has content
         for para in text_frame.paragraphs:
@@ -204,9 +236,41 @@ def _replace_in_text_frame(text_frame, new_text, replace_text=None):
                     para.runs[0].text = new_text
                     for run in para.runs[1:]:
                         run.text = ""
+                    if "\n" in new_text:
+                        _explode_newlines(para)
                 else:
                     para.text = new_text
+                wrote = True
                 break
+        if not wrote and text_frame.paragraphs:
+            # An empty box assigned a full-text value used to no-op silently
+            text_frame.paragraphs[0].text = new_text
+            wrote = True
+    return wrote
+
+
+def _explode_newlines(paragraph):
+    """Turn literal newlines inside runs into real <a:br/> line breaks.
+
+    run.text stores '\\n' verbatim in <a:t>, which PowerPoint renders as
+    whitespace rather than a break — a multi-line value looked right in
+    the COM live preview but flattened (or vanished visually) in the
+    exported deck. Each split keeps the source run's formatting.
+    """
+    for run in list(paragraph.runs):
+        if "\n" not in run.text:
+            continue
+        parts = run.text.split("\n")
+        r = run._r
+        run.text = parts[0]
+        anchor = r
+        for part in parts[1:]:
+            br = r.makeelement(qn("a:br"), {})
+            anchor.addnext(br)
+            new_r = deepcopy(r)
+            new_r.find(qn("a:t")).text = part
+            br.addnext(new_r)
+            anchor = new_r
 
 
 def _replace_across_runs(paragraph, old_text, new_text):

@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 
 from config.paths import TEMPLATES_DIR
 
 logger = logging.getLogger(__name__)
 
 THUMBS_DIR = os.path.join(TEMPLATES_DIR, "thumbs")
+
+# Clicking through the template list fires one background export per
+# selection; concurrent PowerPoint COM instances racing on the PNG cache
+# is a known failure pile-up — exports run one at a time.
+_EXPORT_LOCK = threading.Lock()
 
 
 def _thumb_path(template_path):
@@ -85,6 +91,7 @@ def _export_thumbnail(template_path, png_path, width):
     app = None
     prs = None
     initialized = False
+    _EXPORT_LOCK.acquire()
     try:
         pythoncom.CoInitialize()
         initialized = True
@@ -117,3 +124,4 @@ def _export_thumbnail(template_path, png_path, width):
                 pythoncom.CoUninitialize()
             except Exception:
                 pass
+        _EXPORT_LOCK.release()

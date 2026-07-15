@@ -583,3 +583,120 @@ def test_text_assignment_on_shape_without_text_frame_is_silent_noop(tmp_path):
 
     assert report.filled == 0
     assert report.ok is True
+
+
+# ── Multi-line targets and values (Windows batch 4 regressions) ───────────────
+# A replace target selected across lines carries '\n' (the UI preview joins
+# paragraphs with it) or '\v' (PowerPoint soft line breaks) — characters the
+# run text being searched NEVER contains. The replace silently no-oped while
+# the report claimed "filled", and multi-line VALUES lost their line breaks
+# (a literal '\n' inside <a:t> renders as whitespace, not a break).
+
+def _add_two_paragraph_box(pptx_path, line1, line2):
+    prs = Presentation(pptx_path)
+    slide = prs.slides[0]
+    box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(5), Inches(1.5))
+    tf = box.text_frame
+    tf.text = line1
+    p2 = tf.add_paragraph()
+    p2.text = line2
+    shape_idx = len(slide.shapes) - 1
+    prs.save(pptx_path)
+    return shape_idx
+
+
+def test_multiline_target_across_paragraphs_fills_and_reports_ok(tmp_path):
+    from engine.pptx_fill import fill_template_report
+    tpl = _new_deck(tmp_path)
+    idx = _add_two_paragraph_box(tpl, "Prepared for: Client Name",
+                                 "Presented by: Account Executive")
+    out = str(tmp_path / "out.pptx")
+    mapping = _mapping(1, idx, metric="AE", format="text",
+                       replace_text="Prepared for: Client Name\n"
+                                    "Presented by: Account Executive")
+
+    _path, report = fill_template_report(tpl, out, mapping,
+                                         {"AE": "Jordan Fox, Spectrum Reach"})
+
+    assert report.ok is True and report.filled == 1
+    text = _shape_text(out, 0, idx)
+    assert "Jordan Fox, Spectrum Reach" in text
+    assert "Account Executive" not in text  # later target lines cleared
+
+
+def test_soft_linebreak_target_fills(tmp_path):
+    """One paragraph broken with <a:br/>: scan/preview text carries '\\v',
+    which the runs never contain."""
+    from engine.pptx_fill import fill_template_report
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(5), Inches(1))
+    box.text_frame.text = "Client Name\vAccount Executive"  # -> run <a:br/> run
+    tpl = str(tmp_path / "t.pptx")
+    prs.save(tpl)
+    out = str(tmp_path / "out.pptx")
+    mapping = _mapping(1, 0, metric="AE", format="text",
+                       replace_text="Client Name\vAccount Executive")
+
+    _path, report = fill_template_report(tpl, out, mapping, {"AE": "Jordan"})
+
+    assert report.ok is True
+    text = _shape_text(out, 0, 0)
+    assert "Jordan" in text and "Account Executive" not in text
+
+
+def test_failed_partial_replace_is_reported_not_filled(tmp_path):
+    from engine.pptx_fill import fill_template_report
+    tpl = _new_deck(tmp_path)
+    idx = _add_textbox(tpl, 0, [("Static text", False)])
+    out = str(tmp_path / "out.pptx")
+    mapping = _mapping(1, idx, metric="M", format="text",
+                       replace_text="Nope line 1\nNope line 2")
+
+    _path, report = fill_template_report(tpl, out, mapping, {"M": "42"})
+
+    assert report.ok is False
+    assert report.filled == 0
+    assert report.unmatched_placeholders  # loudly reported, never silent
+
+
+def test_multiline_value_becomes_real_line_breaks(tmp_path):
+    """A value containing '\\n' must produce <a:br/> elements — a literal
+    newline inside <a:t> renders as whitespace in PowerPoint."""
+    tpl = _new_deck(tmp_path)
+    # Mixed-case context so the all-caps case-forcing quirk stays out of
+    # this test's way — the line-break behavior is what's under test.
+    idx = _add_textbox(tpl, 0, [("Contact: ", True), ("[Ph]", False)])
+    out = str(tmp_path / "out.pptx")
+
+    fill_template(tpl, out,
+                  _mapping(1, idx, metric="C", format="text",
+                           replace_text="[Ph]"),
+                  {"C": "Jordan Fox\n555-0100"})
+
+    prs = Presentation(out)
+    para = prs.slides[0].shapes[idx].text_frame.paragraphs[0]
+    from pptx.oxml.ns import qn
+    assert len(para._p.findall(qn("a:br"))) == 1     # real line break
+    assert all("\n" not in r.text for r in para.runs)  # no literal newlines
+    assert "Jordan Fox" in para.text and "555-0100" in para.text
+    assert para.runs[0].font.bold is True  # formatting still intact
+
+
+def test_full_assignment_to_empty_box_writes_value(tmp_path):
+    """Assigning a full-text value to an empty box used to no-op silently."""
+    from engine.pptx_fill import fill_template_report
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1))
+    tpl = str(tmp_path / "t.pptx")
+    prs.save(tpl)
+    out = str(tmp_path / "out.pptx")
+
+    _path, report = fill_template_report(tpl, out,
+                                         _mapping(1, 0, metric="M",
+                                                  format="text"),
+                                         {"M": "FILLED"})
+
+    assert report.filled == 1
+    assert _shape_text(out, 0, 0) == "FILLED"

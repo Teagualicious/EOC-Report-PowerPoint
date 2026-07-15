@@ -1,5 +1,33 @@
 # Changelog
 
+## July 14, 2026 - Multi-line text fills land reliably; repeated report runs stay stable
+
+- **Assigned text no longer vanishes from exported decks.** Two root causes,
+  both in the built-in fill engine (the path Auto-Fill Report uses):
+  - A replace target selected across lines carries line-break characters
+    (paragraph joins, PowerPoint soft breaks) that the text runs being
+    searched never contain — the replace silently did nothing while the
+    fill report claimed "filled". Multi-line targets are now matched line
+    by line: the first target line receives the value, the remaining
+    target lines are cleared, and the report reflects the ACTUAL outcome —
+    a failed replace is always surfaced as an unmatched placeholder.
+  - A multi-line value (e.g. custom text with several lines) was written
+    as a literal newline inside the text run, which PowerPoint renders as
+    whitespace — it looked right in the live preview but flattened or
+    visually vanished in the exported file. Values now produce real
+    PowerPoint line breaks with the run's formatting preserved.
+  - Bonus: assigning a full-text value to an empty text box used to no-op
+    silently; it now writes the value.
+- **The program stays healthy across repeated report generations.** The
+  live preview released its COM apartment on every cleanup — and cleanup
+  runs twice per mapper session (explicit close + garbage collection) — so
+  the UI thread's Office automation degraded after a few cycles ("works
+  twice, errors the third time"). COM is now initialized/released exactly
+  once per preview. The COM template scan no longer leaks an open
+  PowerPoint presentation on failure, and template-thumbnail exports are
+  serialized so rapid clicking can't pile up PowerPoint processes.
+- 297 automated tests pass.
+
 ## July 14, 2026 - Dynamic output folder, faster exports, cleaner review KPIs
 
 - **Renaming the project folder no longer resurrects the old folder.**
