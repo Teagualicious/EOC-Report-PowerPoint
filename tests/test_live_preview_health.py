@@ -145,6 +145,18 @@ def test_mapper_fallback_condition_after_disable(preview):
     assert preview.is_active() is False
 
 
+def test_cleanup_is_idempotent_and_balances_com(preview):
+    """cleanup() runs from both explicit close AND __del__. The second call
+    must never attempt another CoUninitialize — the unbalanced apartment
+    made COM automation fail after a few report cycles (regression from
+    on-site stress testing)."""
+    assert preview._com_initialized is False  # no COM on this platform
+    preview.cleanup()
+    preview.cleanup()  # destructor path — must be safe to repeat
+    assert preview.active is False
+    assert preview._com_initialized is False
+
+
 # ── _resolve_shape identity resolution (mapper roadmap Phase 4) ───────────────
 # The COM-side drift logic CI can pin: a fake 1-indexed Shapes collection
 # where the positional slot no longer holds the mapped shape.

@@ -4,7 +4,7 @@
 
 ## Current phase
 
-Phase 6 — Windows debugging batch 3 (complete): dynamic output folder, faster export stage with live progress, review-KPI cleanup
+Phase 7 — Windows debugging batch 4 (complete): multi-line text fill reliability + COM lifecycle stability across repeated runs
 
 The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTracking handoff zip, 2026-07-12 build) lives at the repo root. See `AI_CONTEXT.md` and `documentation/MODEL_HANDOFF.md` before touching application code. Releases so far: v1.23.0 (repository integration), v1.24.0 (MappingModel extraction).
 
@@ -52,11 +52,16 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
   - **Reach/Frequency hardcoded out of review KPIs** (totals AND per-campaign detail) until real household-level dedup data/formulas exist — supersedes the 2026-07-13 relabel-and-flag rule. Values remain in exported workbook rows and the Excel search.
   - **Consistent KPI number formatting** via `engine.kpi.format_kpi_value` used by cards, campaign summaries, and detail rows: counts render whole with commas (float noise tolerated), rates get `%`, money gets `$`.
   - 291 tests pass (12 net new this phase).
+- Phase 7 (2026-07-14) — Windows debugging batch 4 (from on-site stress testing):
+  - **Multi-line text fill loss fixed** (the "assigned text doesn't show up in the export" bug, mostly via Auto-Fill Report → built-in engine). Root causes proven at XML level: (a) multi-line replace targets carry `\n` (UI paragraph joins) / `\v` (soft breaks) that run text never contains → per-paragraph match silently no-oped while the report's frame-text check said "filled"; (b) multi-line values written into runs store a literal `\n` in `<a:t>` which PowerPoint renders as whitespace (looked right in COM live preview, flattened in export). Fixes in `engine/pptx_fill.py`: line-by-line target matching (first line gets value, rest cleared, single-line behavior byte-identical), `_explode_newlines` converts written `\n` into real `<a:br/>` (formatting copied), `_replace_in_text_frame` returns the outcome and the report records from it — failed replaces are always unmatched-placeholder now. Full-assign to an empty box writes instead of no-op.
+  - **Repeated-run stability**: `PPTXLivePreview.cleanup()` unbalanced the UI thread's COM apartment (CoUninitialize on every call; cleanup runs twice per session via explicit close + `__del__`) → Office automation failed after ~2–3 report cycles. Now `_com_initialized` guard = exactly one CoUninitialize per CoInitialize, idempotent cleanup. `_scan_with_com` closes the presentation and balances COM on failure (try/finally). Thumbnail exports serialized (`pptx_thumbs._EXPORT_LOCK`) so fast template-list clicking can't pile up PowerPoint processes (part of roadmap Phase 5's known issue).
+  - 297 tests pass (6 new: multi-line target across paragraphs, soft-break target, failed-replace reporting, real line breaks with formatting, empty-box write, idempotent cleanup).
 
 ## Next up
 
 1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, the refactored mapper, the Phase-4 drift drill (id parity between python-pptx/COM scans, live cut-paste retargeting, legacy-mapping regression), and now batch 3: rename the project folder → export lands in the renamed folder's `output/`; multi-client export launches ONE Excel process; status line narrates stages; review shows no Reach/Frequency and formats counts/%/$ consistently. Per `documentation/TESTING_AND_RELEASE.md` and the checklist in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
-2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce, client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
+2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce [thumbnail exports are now serialized — Phase 7 — but the selection debounce is still open], client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
+3. **Template-first mapper (accepted proposal, not scheduled)** — ingest→classify→map→build rework of the mapper around a JSON IR with named slots. Before starting: read `documentation/proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md` AND `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md` (critique, required design changes — static shapes copied as verbatim XML, uid-based slot reconciliation — phasing A–D, and the reuse map onto existing modules). Prerequisite from Noticed: extend `resolve_query()` to honor builder-query keys.
 
 ## Decisions log
 
@@ -81,6 +86,10 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-14 — Reach/Frequency **omitted** from review KPIs (supersedes the relabel-and-flag rule): even honestly-labeled non-dedup values invited bad comparisons against vendor dashboards. They return when household-level data/formulas exist; workbook rows keep the raw values.
 - 2026-07-14 — The default output folder is never persisted in settings.json (unset key = follow the project folder); only user-chosen custom folders are stored. Stale default-shaped paths from renamed/moved projects fall back on load.
 - 2026-07-14 — **v1.29.0** — Windows debugging batch 3; releases on merge via the VERSION-file workflow.
+- 2026-07-14 — Fill reporting is outcome-based: `_replace_in_text_frame` returns whether it wrote; "filled" is recorded only when text actually changed. The old frame-text containment check could claim filled for replaces that did nothing (multi-line targets).
+- 2026-07-14 — Multi-line replace semantics: first target line receives the value, remaining target lines are cleared; single-line targets keep the exact previous matching (plus a trimmed retry for selections with stray whitespace).
+- 2026-07-14 — **v1.30.0** — Windows debugging batch 4 (multi-line fills + COM lifecycle); releases on merge.
+- 2026-07-15 — **Template-first mapper architecture accepted as the v2 direction** (owner proposal): ingest client decks into a JSON IR with named slots, build new decks instead of editing in place. Documented in `documentation/proposals/` + reviewed in `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md`; key review amendments: static shapes are copied as verbatim XML (never rebuilt from schema), charts are their own phase via chart-part cloning, slots reconcile across re-ingests by shape uid, template store lives under `workspace/` (data hygiene). Current mapper remains the production path until template-first survives a real month-end cycle. Not scheduled; doc-only — no release.
 
 ## Noticed (not yet acted on)
 

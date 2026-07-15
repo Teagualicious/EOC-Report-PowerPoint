@@ -83,6 +83,12 @@ class PPTXLivePreview:
         # (slide_num, shape_index) -> list of original paragraph texts,
         # captured before a shape's first modification (used by Clear All)
         self._original_paragraphs = {}
+        # COM apartment bookkeeping: CoUninitialize must run EXACTLY once
+        # per successful CoInitialize. cleanup() used to uninitialize on
+        # every call (explicit close + __del__ = twice per session), which
+        # unbalanced the UI thread's apartment and made COM automation
+        # fail after a few report cycles.
+        self._com_initialized = False
 
         if not _com_available:
             return
@@ -96,6 +102,7 @@ class PPTXLivePreview:
 
             # Initialize COM
             pythoncom.CoInitialize()
+            self._com_initialized = True
 
             # Open PowerPoint (must be Visible for COM; minimized instead)
             self.pptx_app = win32com.client.Dispatch("PowerPoint.Application")
@@ -686,7 +693,11 @@ class PPTXLivePreview:
                 logger.debug("Could not remove working copy %s",
                              self._working_copy, exc_info=True)
 
-        if _com_available:
+        # Balance CoInitialize exactly once — cleanup() runs again from
+        # __del__, and an extra CoUninitialize tears down the UI thread's
+        # COM apartment out from under any newer preview/automation.
+        if self._com_initialized:
+            self._com_initialized = False
             try:
                 pythoncom.CoUninitialize()
             except Exception:

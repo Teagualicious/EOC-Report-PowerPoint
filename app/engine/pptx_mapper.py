@@ -125,10 +125,27 @@ def _scan_with_com(template_path):
     except ImportError as exc:
         raise RuntimeError("COM scan unavailable: pywin32 is not installed") from exc
     pythoncom.CoInitialize()
+    prs = None
+    try:
+        app = win32com.client.Dispatch("PowerPoint.Application")
+        prs = app.Presentations.Open(os.path.abspath(template_path),
+                                     ReadOnly=True, WithWindow=False)
+        return _walk_com_slides(prs)
+    finally:
+        # A scan failure must not leak the open presentation or an
+        # unbalanced COM apartment on the calling thread.
+        if prs is not None:
+            try:
+                prs.Close()
+            except Exception:
+                logger.debug("COM scan presentation close failed", exc_info=True)
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            logger.debug("CoUninitialize failed after COM scan", exc_info=True)
 
-    app = win32com.client.Dispatch("PowerPoint.Application")
-    prs = app.Presentations.Open(os.path.abspath(template_path), ReadOnly=True, WithWindow=False)
 
+def _walk_com_slides(prs):
     slides = []
     for si in range(1, prs.Slides.Count + 1):
         slide = prs.Slides(si)
@@ -181,8 +198,6 @@ def _scan_with_com(template_path):
 
         slides.append(slide_info)
 
-    prs.Close()
-    pythoncom.CoUninitialize()
     return slides
 
 
