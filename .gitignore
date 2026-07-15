@@ -35,3 +35,6 @@ output/*
 .env
 *.pem
 *.key
+
+# Offline wheelhouse (shipped only inside the portable release zip)
+wheelhouse/
