@@ -104,11 +104,13 @@ Use a Windows 10/11 machine with current desktop Excel and PowerPoint.
 
 Distribution shapes (the launcher supports all of them automatically):
 
-1. **Source zip** (GitHub's auto asset) — the launcher installs packages
-   from the internet on first run.
+1. **Standard zip** (`IngestionEngine-<version>.zip`, published
+   automatically by the Release workflow) — the source tree; the launcher
+   installs packages from the internet on first run. GitHub's auto
+   "Source code" assets behave identically.
 2. **Portable zip** (`IngestionEngine-<version>-portable-win64.zip`,
-   published automatically by the Release workflow) — the source tree plus
-   a `wheelhouse/` of Windows wheels for every runtime dependency (built
+   published automatically alongside it) — the same tree plus a
+   `wheelhouse/` of Windows wheels for every runtime dependency (built
    for Python 3.12). The launcher detects `wheelhouse/` and installs from
    it offline; on a different Python version it falls back to the internet
    path. Only Python itself must already be on the machine.

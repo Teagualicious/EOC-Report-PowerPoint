@@ -18,6 +18,11 @@
   removed from the client wizard, and the all-caps case-matching rule is
   now an explicit product decision: inserted values match the deck's
   case ("CLIENT NAME" placeholder → "ACME HOLDING").
+- Releases now publish **two download zips**: a standard one
+  (`IngestionEngine-<version>.zip`, smaller — installs packages online on
+  first launch) and the portable one (`…-portable-win64.zip`, bundles
+  every package for offline first-run setup). Release notes explain which
+  to pick.
 - **Template-first mapper Phase A shipped** (`app/engine/template_ir/`):
   ingest any deck into a JSON template schema + extracted assets, then
   rebuild a pixel-identical deck from verbatim shape XML — images

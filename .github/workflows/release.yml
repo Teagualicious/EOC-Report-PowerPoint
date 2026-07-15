@@ -54,7 +54,9 @@ jobs:
           cat >> release_notes.md <<EOF
 
           ---
-          **Which download?** Grab \`IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip\` below — extract anywhere and double-click \`Start Ingestion Engine.bat\`. The first launch sets up its bundled packages automatically (offline, under a minute; requires Python 3.12 from python.org). The plain "Source code" zips work too, but install packages from the internet on first run.
+          **Which download?** Both zips run the same way: extract anywhere, double-click \`Start Ingestion Engine.bat\`.
+          - \`IngestionEngine-${{ steps.v.outputs.version }}.zip\` — standard: smaller, installs its packages from the internet on the first launch.
+          - \`IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip\` — portable: bundles every package; the first launch sets them up offline (no network needed; requires Python 3.12 from python.org).
           EOF
 
       - name: Create tag and release
@@ -67,36 +69,42 @@ jobs:
             --title "Ingestion Engine ${{ steps.v.outputs.version }}" \
             --notes-file release_notes.md
 
-      # Portable zip: the full source tree plus a wheelhouse/ of Windows
-      # wheels for every runtime dependency. The launcher installs from the
-      # wheelhouse offline when it is present, so the zip runs on a machine
-      # with only Python installed — no network, nothing else to download.
+      # Two download zips:
+      #   IngestionEngine-<ver>.zip                 — standard: installs
+      #     packages from the internet on first run.
+      #   IngestionEngine-<ver>-portable-win64.zip  — same, plus a
+      #     wheelhouse/ of Windows wheels; the launcher installs from it
+      #     offline, so only Python itself must be on the machine.
       - name: Set up Python for the wheelhouse
         if: steps.released.outputs.exists == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Build portable zip (source + Windows wheelhouse)
+      - name: Build download zips (standard + portable)
         if: steps.released.outputs.exists == 'false'
         run: |
-          mkdir -p portable/wheelhouse
-          git archive HEAD | tar -x -C portable
-          python -m pip download -r app/requirements.txt -d portable/wheelhouse \
+          VER="${{ steps.v.outputs.version }}"
+          mkdir -p build/src
+          git archive HEAD | tar -x -C build/src
+          (cd build/src && zip -qr "$GITHUB_WORKSPACE/IngestionEngine-$VER.zip" .)
+          mkdir build/src/wheelhouse
+          python -m pip download -r app/requirements.txt -d build/src/wheelhouse \
             --platform win_amd64 --python-version 312 --only-binary=:all:
           # pywin32's "sys_platform == win32" marker evaluates false on this
           # Linux runner and pip skips it — fetch the Windows wheel explicitly
           # (keep the version in sync with app/requirements.txt)
           PYWIN32_PIN="$(grep -oE 'pywin32==[0-9]+' app/requirements.txt)"
-          python -m pip download "$PYWIN32_PIN" -d portable/wheelhouse \
+          python -m pip download "$PYWIN32_PIN" -d build/src/wheelhouse \
             --platform win_amd64 --python-version 312 --only-binary=:all:
-          (cd portable && zip -qr \
-            "../IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip" .)
+          (cd build/src && zip -qr \
+            "$GITHUB_WORKSPACE/IngestionEngine-$VER-portable-win64.zip" .)
 
-      - name: Attach portable zip to the release
+      - name: Attach download zips to the release
         if: steps.released.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${{ steps.v.outputs.version }}" \
+            "IngestionEngine-${{ steps.v.outputs.version }}.zip" \
             "IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip" --clobber
