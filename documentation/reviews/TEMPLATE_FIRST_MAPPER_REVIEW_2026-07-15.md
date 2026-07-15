@@ -163,6 +163,29 @@ yield an equivalent schema (round-trip idempotence), and every build
 emits a report — silent partial output is the failure mode this project
 has been burned by twice (fill placeholders, Excel re-export).
 
+## Library landscape (evaluated 2026-07-15)
+
+Could a different Python PowerPoint library avoid the issues above? No
+pure-Python one — and the biggest risk (brand drift from schema
+rebuilds) is architectural, not library-bound: it follows from
+re-authoring shapes off an abstract description, whichever library
+authors them. The verbatim-XML amendment fixes it *within* python-pptx,
+which exposes the raw lxml elements that strategy needs.
+
+| Option | What it would solve | Why not (or when) |
+|---|---|---|
+| python-pptx (current) | Everything in Phases A/B with the verbatim-XML strategy; fully CI-testable | Chart-part cloning is manual plumbing (Phase C); no slide rendering |
+| Aspose.Slides for Python (commercial, .NET-based) | First-class high-fidelity cloning; complete chart APIs (collapses Phase C); SmartArt; **renders slides to PNG without PowerPoint** (would delete the COM preview/thumbnail apparatus) | Per-dev license (~$1k+); bundles a .NET runtime into a copy-the-folder portable app; a procurement event that dents the "no new vendors" security pitch. Re-evaluate at Phase C if chart-heavy templates dominate |
+| Spire.Presentation (commercial, .NET-based) | Similar shape to Aspose, generally a tier below | Free tier limited to a few slides; same procurement/runtime costs |
+| Thin python-pptx wrappers (pptx-template etc.) | Nothing we haven't built | Token replacement over the same engine |
+| LibreOffice headless (UNO) | Free rendering/conversion | Different rendering engine — fidelity drift on PowerPoint-authored decks is the norm; disqualifying when brand exactness is the goal |
+| PowerPoint COM | Perfect fidelity by definition | The fragility this proposal exists to escape; Windows-only, kills the CI-testable pipeline |
+
+**Decision:** stay on python-pptx; keep `ingest.py`/`build.py` the only
+modules that touch the library so the IR isolates a future swap.
+Re-evaluate Aspose.Slides specifically at Phase C (charts), priced
+against real chart-heavy template volume.
+
 ## Open questions for the owner (record answers here)
 
 1. Fidelity bar: is "indistinguishable at presentation distance"
