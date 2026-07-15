@@ -19,4 +19,5 @@ This directory is organized so the current implementation is clearly separated f
 ## Supporting material
 
 - `reviews/` contains dated code and UI review reports, including the Windows laptop photo review in `UI_REVIEW_2026-07-10.md`.
+- `proposals/` contains accepted-but-unscheduled design proposals. Currently: `TEMPLATE_FIRST_MAPPER_2026-07-15.md` (ingest→classify→map→build mapper rework) — read it together with its review, `reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md`, before starting that work.
 - `archive/` contains historical project notes and superseded design specifications. They are useful for context, but they are not authoritative for the current folder layout or behavior.

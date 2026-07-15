@@ -115,6 +115,13 @@ identity still resolve positionally, bit-for-bit as before.
 - Decide: keep or fix all-caps placeholder case-forcing (Phase 1 quirk).
 
 ### Parking lot
+- **Template-first mapper architecture (v2 direction, accepted 2026-07-15):**
+  ingest client decks into a JSON IR with named slots, then BUILD new decks
+  instead of editing in place. Supersedes this roadmap's incremental track
+  *if/when built* — Phase 5 items above remain worth doing for the current
+  mapper in the meantime. Proposal:
+  `../proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md`; critique, phasing, and
+  codebase-integration map: `TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md`.
 - PySide6 evaluation is a **v2 full-app decision**, not a per-window port
   (two GUI mainloops can't share a process). Revisit only if the tool is
   adopted post-internship.

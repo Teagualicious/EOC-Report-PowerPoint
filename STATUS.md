@@ -60,7 +60,8 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 ## Next up
 
 1. Windows/Office acceptance pass — Excel VBA injection, PowerPoint COM live preview, fill-summary dialogs, `fill_history.jsonl`, the refactored mapper, the Phase-4 drift drill (id parity between python-pptx/COM scans, live cut-paste retargeting, legacy-mapping regression), and now batch 3: rename the project folder → export lands in the renamed folder's `output/`; multi-client export launches ONE Excel process; status line narrates stages; review shows no Reach/Frequency and formats counts/%/$ consistently. Per `documentation/TESTING_AND_RELEASE.md` and the checklist in `documentation/reviews/MAPPER_RELIABILITY_ROADMAP_2026-07-12.md`. Nothing COM-related may be declared verified until this passes.
-2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce, client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
+2. Mapper roadmap Phase 5 — small fixes from the July 11 review (template-preview debounce [thumbnail exports are now serialized — Phase 7 — but the selection debounce is still open], client-wizard drag-select dead code, all-caps case-forcing decision, skip-discards-assignments decision — see Noticed).
+3. **Template-first mapper (accepted proposal, not scheduled)** — ingest→classify→map→build rework of the mapper around a JSON IR with named slots. Before starting: read `documentation/proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md` AND `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md` (critique, required design changes — static shapes copied as verbatim XML, uid-based slot reconciliation — phasing A–D, and the reuse map onto existing modules). Prerequisite from Noticed: extend `resolve_query()` to honor builder-query keys.
 
 ## Decisions log
 
@@ -88,6 +89,7 @@ The Spectrum Reach Reporting Ingestion Engine (from the IngestionEngine_FillTrac
 - 2026-07-14 — Fill reporting is outcome-based: `_replace_in_text_frame` returns whether it wrote; "filled" is recorded only when text actually changed. The old frame-text containment check could claim filled for replaces that did nothing (multi-line targets).
 - 2026-07-14 — Multi-line replace semantics: first target line receives the value, remaining target lines are cleared; single-line targets keep the exact previous matching (plus a trimmed retry for selections with stray whitespace).
 - 2026-07-14 — **v1.30.0** — Windows debugging batch 4 (multi-line fills + COM lifecycle); releases on merge.
+- 2026-07-15 — **Template-first mapper architecture accepted as the v2 direction** (owner proposal): ingest client decks into a JSON IR with named slots, build new decks instead of editing in place. Documented in `documentation/proposals/` + reviewed in `documentation/reviews/TEMPLATE_FIRST_MAPPER_REVIEW_2026-07-15.md`; key review amendments: static shapes are copied as verbatim XML (never rebuilt from schema), charts are their own phase via chart-part cloning, slots reconcile across re-ingests by shape uid, template store lives under `workspace/` (data hygiene). Current mapper remains the production path until template-first survives a real month-end cycle. Not scheduled; doc-only — no release.
 
 ## Noticed (not yet acted on)
 
