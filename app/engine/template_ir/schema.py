@@ -11,7 +11,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"   # 1.1: classification reasons, excluded flag, slot registry
 
 TEMPLATE_JSON_NAME = "template.json"
 ASSETS_DIR_NAME = "assets"
@@ -32,8 +32,10 @@ class ShapeIR:
     element_xml: str
     text: str = ""                   # plain-text snapshot
     image_rels: dict = field(default_factory=dict)  # embed rId -> asset rel path
-    classification: str = "static"   # Phase B refines; Phase A default
-    slot_name: str | None = None
+    classification: str = "static"   # static|dynamic (suggested, user-reviewed)
+    classify_reason: str = ""        # why the heuristic suggested it
+    excluded: bool = False           # user removed it entirely — builder skips
+    slot_name: str | None = None     # first slot on this shape (display helper)
     unsupported: str | None = None   # e.g. "chart" — builder skips + reports
 
 
@@ -54,6 +56,11 @@ class TemplateIR:
     slide_width_emu: int
     slide_height_emu: int
     slides: list
+    # slot_name -> {type, description, slide_index, shape_id, shape_uid,
+    #               placeholder_text, paragraph, run}. Slots pin to
+    #               (shape identity + placeholder text); paragraph/run
+    #               indices are reconciliation hints only, never identity.
+    slot_registry: dict = field(default_factory=dict)
 
     def to_dict(self):
         return asdict(self)
@@ -71,7 +78,8 @@ class TemplateIR:
                    created_at=data.get("created_at", ""),
                    slide_width_emu=data["slide_width_emu"],
                    slide_height_emu=data["slide_height_emu"],
-                   slides=slides)
+                   slides=slides,
+                   slot_registry=data.get("slot_registry", {}))
 
 
 def save_template_ir(ir, template_dir):

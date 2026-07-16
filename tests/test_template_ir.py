@@ -68,7 +68,7 @@ def test_ingest_writes_schema_and_assets(tmp_path, branded_deck):
 
     assert os.path.isfile(os.path.join(template_dir, "template.json"))
     ir = load_template_ir(template_dir)
-    assert ir.schema_version == "1.0"
+    assert ir.schema_version == "1.1"
     assert ir.slide_width_emu == int(Inches(13.333))
 
     (slide,) = ir.slides

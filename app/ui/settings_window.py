@@ -148,6 +148,9 @@ class SettingsWindow:
         tk.Button(btn, text="Import…", font=("Segoe UI", 9), bg=t["success"],
                   fg="white", relief="flat", padx=10, pady=4,
                   command=self._import_template).pack(side="left")
+        tk.Button(btn, text="🧪 Template-First…", font=("Segoe UI", 9),
+                  bg="#8B4513", fg="white", relief="flat", padx=10, pady=4,
+                  command=self._open_template_first).pack(side="right")
 
     def _refresh_templates(self):
         self.tmpl_listbox.delete(0, tk.END)
@@ -291,6 +294,14 @@ class SettingsWindow:
         dummy_export = {"client_name": "", "client_data": [], "folder": ""}
         PPTXWizard(self.window, dummy_export, self.theme,
                    template_path=tmpl["path"])
+
+    def _open_template_first(self):
+        """Template-first (beta) pipeline: ingest a deck into the template
+        store, review classifications, map named slots. No client data in
+        the settings context — building the report happens from a report
+        flow, where the same launcher opens with data attached."""
+        from mapper.template_review import open_template_first
+        open_template_first(self.window, self.theme)
 
     def _rename_template(self):
         sel = self.tmpl_listbox.curselection()

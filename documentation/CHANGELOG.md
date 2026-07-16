@@ -1,5 +1,43 @@
 # Changelog
 
+## July 16, 2026 - Template-first mapper Phase B: classification, slots, dynamic text builds
+
+- **Template-first Phase B shipped — text slots end to end.** An ingested
+  template can now be classified, reviewed, mapped, and built into a
+  monthly report without touching the original deck:
+  - **Auto-classification** (`engine/template_ir/classify.py`) suggests
+    static (branding, copied verbatim) vs dynamic (receives data) per
+    shape, detects placeholder-looking runs ("X,XXX", "XX%", "N/A",
+    "{{token}}", client-name/date headers), and names slots from paired
+    all-caps labels (the "X,XXX" over "IMPRESSIONS" callout becomes slot
+    `impressions`). Suggestions only — a review step is mandatory.
+  - **Template Review window** (`mapper/template_review.py`): green/orange
+    shape cards per slide with the reason for each suggestion; override
+    classifications, rename slots, exclude shapes from the build.
+  - **Slot registry in the template schema** (v1.1, loads v1.0 stores
+    unchanged): slots pin to shape identity + placeholder text (the
+    Phase 4 lesson — never positional indices).
+  - **Slot mapping** (`engine/template_ir/mapping.py` + the Map Slots
+    window): each slot maps to the same query objects the current mapper
+    uses — simple options AND Advanced Query Builder queries (the builder
+    window is reused as-is). Map-time validation warns on unmapped slots
+    and type mismatches ("text source mapped to a number slot"); live
+    value preview per slot when opened from a report.
+  - **Dynamic text build**: slot values are written into the verbatim
+    shape copies through the production fill machinery (multi-line values
+    become real line breaks; run formatting untouched by construction).
+    Every build reports slots filled/unfilled and shapes skipped — no
+    silent partial output.
+  - Entry points: Settings → Templates → "Template-First…", and the
+    report template selector. The current mapper remains the production
+    path; template-first is opt-in until it survives a month-end cycle.
+- Owner decision recorded: slot data sources reuse the **full existing
+  query schema** including builder/pivot queries (the review doc's open
+  question 4); pivot-driven tables/charts remain Phase C.
+- 30 new tests (heuristics, registry mutations, mapping round-trip and
+  validation, resolver formatting, build fill/report paths); the Phase A
+  round-trip invariant is unchanged.
+
 ## July 15, 2026 - Saved-query fidelity, mapper polish, template-first Phase A
 
 - **Saved builder queries now re-resolve to exactly the value shown when
