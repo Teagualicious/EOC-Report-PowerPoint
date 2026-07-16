@@ -1,4 +1,14 @@
-"""Advanced query builder popup: multi-select filters + visual pivot table."""
+"""Query search popup: the Excel search's term grammar over a live pivot.
+
+DEMO REWORK (v1.32 branch): the multi-select filter panels are replaced
+by a search box speaking the exported workbook's Search-sheet grammar —
+comma-separated metric names, breakdown types, level values, campaign
+names, and the "campaign" keyword (parsed by engine.search_terms). Only
+ordering controls remain as widgets (Order + Show, also typeable as
+"top 5" / "bottom 3" / "a-z"). Everything downstream is unchanged: the
+same build_pivot preview, Apply as Value/Table/Chart, metric naming, and
+saved-query behavior.
+"""
 
 import logging
 import tkinter as tk
@@ -10,6 +20,8 @@ import pandas as pd
 from engine.pivot import build_pivot, pivot_total  # noqa: F401 — re-exported;
 # moved to engine/ so the query resolver can reuse it without tkinter
 from engine.query_resolver import get_available_breakdowns
+from engine.search_terms import (SORT_LABELS, apply_sort, default_metric,
+                                 parse_search_terms)
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +39,13 @@ def _auto_query_name(query, existing):
 
 
 def show_query_builder(wizard):
-    """Open the advanced query builder; writes the chosen query/metric back
+    """Open the query search; writes the chosen query/metric back
     onto the wizard (selected_metric, _pending_query, _pending_table_data,
     _pending_chart_data)."""
     t = wizard.t
 
     win = tk.Toplevel(wizard.window)
-    win.title("Advanced Query Builder")
+    win.title("Query Search")
     fit_window(win, 950, 700)
     win.configure(bg=t["bg"]); win.transient(wizard.window); win.grab_set()
     win.lift(); win.focus_force()
@@ -80,114 +92,64 @@ def show_query_builder(wizard):
 
     full_df = cache["df"]
     metrics_list = sorted(full_df["metric"].unique())
-    sources_list = sorted(full_df["source"].unique())
     campaigns_list = cache["campaigns"]
     breakdowns = cache["breakdowns"]
 
-    # ── Top controls row ──
+    # ── Search row (the Search-sheet grammar, same as the Excel export) ──
+    search_row = tk.Frame(win, bg=t["bg"])
+    search_row.pack(fill="x", padx=10, pady=(10, 2))
+    tk.Label(search_row, text="🔍 Search:", font=("Calibri", 11, "bold"),
+             bg=t["bg"], fg=t["fg"]).pack(side="left", padx=(0, 5))
+    search_var = tk.StringVar()
+    search_entry = tk.Entry(search_row, textvariable=search_var, width=64,
+                            font=("Calibri", 11), bg=t["input_bg"],
+                            fg=t["input_fg"], insertbackground=t["insert"],
+                            relief="solid", borderwidth=1)
+    search_entry.pack(side="left", fill="x", expand=True)
+    search_entry.focus_set()
+
+    tk.Label(win, text="Comma-separated terms, same as the workbook's "
+                       "Search sheet — e.g.   28167, impressions   ·   "
+                       "campaign, network, impressions   ·   "
+                       "top 5, zip, impressions.  Blank = campaign totals.",
+             font=("Calibri", 8), bg=t["bg"], fg=t["muted"], wraplength=920,
+             justify="left").pack(padx=10, anchor="w")
+
+    # ── Order controls (the only remaining widgets; also typeable) ──
     ctrl = tk.Frame(win, bg=t["bg"])
-    ctrl.pack(fill="x", padx=10, pady=(10, 5))
-
-    # Metric selector
-    tk.Label(ctrl, text="Metric:", font=("Calibri", 10, "bold"), bg=t["bg"],
-             fg=t["fg"]).pack(side="left", padx=(0, 3))
-    metric_var = tk.StringVar(value=metrics_list[0] if metrics_list else "")
-    ttk.Combobox(ctrl, textvariable=metric_var, values=metrics_list,
-                 state="readonly", width=18).pack(side="left", padx=(0, 10))
-
-    # Aggregation
+    ctrl.pack(fill="x", padx=10, pady=(4, 2))
     tk.Label(ctrl, text="Agg:", font=("Calibri", 10, "bold"), bg=t["bg"],
              fg=t["fg"]).pack(side="left", padx=(0, 3))
     agg_var = tk.StringVar(value="sum")
-    ttk.Combobox(ctrl, textvariable=agg_var, values=["sum", "avg", "max", "min", "count"],
-                 state="readonly", width=8).pack(side="left", padx=(0, 10))
+    agg_box = ttk.Combobox(ctrl, textvariable=agg_var, state="readonly",
+                           values=["sum", "avg", "max", "min", "count"],
+                           width=7)
+    agg_box.pack(side="left", padx=(0, 12))
 
-    # Top N
-    tk.Label(ctrl, text="Top N:", font=("Calibri", 10, "bold"), bg=t["bg"],
+    tk.Label(ctrl, text="Order:", font=("Calibri", 10, "bold"), bg=t["bg"],
              fg=t["fg"]).pack(side="left", padx=(0, 3))
-    topn_var = tk.StringVar(value="all")
-    ttk.Combobox(ctrl, textvariable=topn_var, values=["all", "3", "5", "10", "15", "20"],
-                 width=5).pack(side="left", padx=(0, 10))
+    sort_by_label = {label: key for key, label in SORT_LABELS}
+    label_by_sort = {key: label for key, label in SORT_LABELS}
+    sort_var = tk.StringVar(value=label_by_sort["largest"])
+    sort_box = ttk.Combobox(ctrl, textvariable=sort_var, state="readonly",
+                            values=list(sort_by_label), width=13)
+    sort_box.pack(side="left", padx=(0, 12))
 
-    # Output kind is chosen by the Apply buttons at the bottom - the old
-    # dropdown duplicated them and confused the flow
+    tk.Label(ctrl, text="Show:", font=("Calibri", 10, "bold"), bg=t["bg"],
+             fg=t["fg"]).pack(side="left", padx=(0, 3))
+    show_var = tk.StringVar(value="all")
+    show_box = ttk.Combobox(ctrl, textvariable=show_var,
+                            values=["all", "3", "5", "10", "15", "20"],
+                            width=5)
+    show_box.pack(side="left")
+
+    ignored_label = tk.Label(win, text="", font=("Calibri", 8, "italic"),
+                             bg=t["bg"], fg="#B8860B", wraplength=920,
+                             justify="left")
+    ignored_label.pack(padx=10, anchor="w")
+
+    # Output kind is chosen by the Apply buttons at the bottom
     output_var = tk.StringVar(value="value")
-
-    # ── Filter panels (3 columns) ──
-    filter_frame = tk.Frame(win, bg=t["bg"])
-    filter_frame.pack(fill="x", padx=10, pady=5)
-    filter_frame.columnconfigure(0, weight=1)
-    filter_frame.columnconfigure(1, weight=1)
-    filter_frame.columnconfigure(2, weight=1)
-
-    # Campaign filter
-    cf = tk.LabelFrame(filter_frame, text="  Campaigns  ", font=("Calibri", 9, "bold"),
-                        bg=t["card"], fg=t["card_fg"])
-    cf.grid(row=0, column=0, sticky="nsew", padx=3)
-    camp_listbox = tk.Listbox(cf, selectmode="extended", height=6, font=("Calibri", 9),
-                               bg=t["input_bg"], fg=t["input_fg"], exportselection=False)
-    camp_listbox.pack(fill="both", expand=True, padx=3, pady=3)
-    for c in campaigns_list:
-        camp_listbox.insert("end", c)
-    # Select all by default
-    camp_listbox.select_set(0, "end")
-    camp_btns = tk.Frame(cf, bg=t["card"])
-    camp_btns.pack(fill="x", padx=3, pady=(0, 3))
-    tk.Button(camp_btns, text="All", font=("Calibri", 8), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=5,
-              command=lambda: camp_listbox.select_set(0, "end")).pack(side="left", padx=1)
-    tk.Button(camp_btns, text="None", font=("Calibri", 8), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=5,
-              command=lambda: camp_listbox.select_clear(0, "end")).pack(side="left", padx=1)
-
-    # Breakdown source filter
-    bf = tk.LabelFrame(filter_frame, text="  Breakdown Type  ", font=("Calibri", 9, "bold"),
-                        bg=t["card"], fg=t["card_fg"])
-    bf.grid(row=0, column=1, sticky="nsew", padx=3)
-    bd_listbox = tk.Listbox(bf, selectmode="extended", height=6, font=("Calibri", 9),
-                             bg=t["input_bg"], fg=t["input_fg"], exportselection=False)
-    bd_listbox.pack(fill="both", expand=True, padx=3, pady=3)
-    for s in sources_list:
-        bd_listbox.insert("end", s)
-    # default: no breakdown selected -> clean campaign-totals preview
-    bd_btns = tk.Frame(bf, bg=t["card"])
-    bd_btns.pack(fill="x", padx=3, pady=(0, 3))
-    tk.Button(bd_btns, text="All", font=("Calibri", 8), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=5,
-              command=lambda: bd_listbox.select_set(0, "end")).pack(side="left", padx=1)
-    tk.Button(bd_btns, text="None", font=("Calibri", 8), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=5,
-              command=lambda: bd_listbox.select_clear(0, "end")).pack(side="left", padx=1)
-
-    # Value filter (level values)
-    vf = tk.LabelFrame(filter_frame, text="  Values  ", font=("Calibri", 9, "bold"),
-                        bg=t["card"], fg=t["card_fg"])
-    vf.grid(row=0, column=2, sticky="nsew", padx=3)
-    val_listbox = tk.Listbox(vf, selectmode="extended", height=6, font=("Calibri", 9),
-                              bg=t["input_bg"], fg=t["input_fg"], exportselection=False)
-    val_listbox.pack(fill="both", expand=True, padx=3, pady=3)
-    val_btns = tk.Frame(vf, bg=t["card"])
-    val_btns.pack(fill="x", padx=3, pady=(0, 3))
-    tk.Button(val_btns, text="All", font=("Calibri", 8), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=5,
-              command=lambda: val_listbox.select_set(0, "end")).pack(side="left", padx=1)
-    tk.Button(val_btns, text="None", font=("Calibri", 8), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=5,
-              command=lambda: val_listbox.select_clear(0, "end")).pack(side="left", padx=1)
-
-    def update_values(*args):
-        val_listbox.delete(0, "end")
-        sel_sources = [bd_listbox.get(i) for i in bd_listbox.curselection()]
-        vals = set()
-        for src in sel_sources:
-            for v in breakdowns.get(src, []):
-                vals.add(v)
-        for v in sorted(vals):
-            val_listbox.insert("end", v)
-        val_listbox.select_set(0, "end")
-
-    bd_listbox.bind("<<ListboxSelect>>", update_values)
-    update_values()
 
     # Result label
     result_label = tk.Label(win, text="", font=("Calibri", 13, "bold"),
@@ -195,17 +157,32 @@ def show_query_builder(wizard):
     result_label.pack(padx=10, anchor="w")
 
     def refresh_pivot():
-        metric = metric_var.get()
-        agg = agg_var.get()
-        topn = topn_var.get()
-        sel_camps = [camp_listbox.get(i) for i in camp_listbox.curselection()]
-        sel_sources = [bd_listbox.get(i) for i in bd_listbox.curselection()]
-        sel_vals = [val_listbox.get(i) for i in val_listbox.curselection()]
+        parsed, ignored = parse_search_terms(
+            search_var.get(), metrics_list, breakdowns, campaigns_list)
+        ignored_label.config(
+            text="  ·  ".join(f"“{term}” ignored — {why}"
+                              for term, why in ignored))
+        # Typed ordering terms ("top 5", "a-z") drive the controls, so the
+        # widgets always show what the table is doing
+        if parsed["sort"]:
+            sort_var.set(label_by_sort[parsed["sort"]])
+        if parsed["top_n"] != "all":
+            show_var.set(parsed["top_n"])
 
-        pivot, note = build_pivot(full_df, metric, agg, topn,
-                                  sel_camps, sel_sources, sel_vals)
-        if pivot is None:
-            result_label.config(text=note or "No data matches filters")
+        metric = parsed["metric"] or default_metric(metrics_list)
+        agg = agg_var.get()
+        sort = sort_by_label.get(sort_var.get(), "largest")
+        top_n = show_var.get().strip() or "all"
+        # Campaigns: typed names narrow the search; none typed = all (the
+        # old panel's select-all default)
+        sel_camps = parsed["campaigns"] or campaigns_list
+
+        pivot, note = build_pivot(full_df, metric, agg, "all",
+                                  sel_camps, parsed["sources"],
+                                  parsed["values"])
+        pivot = apply_sort(pivot, sort, top_n)
+        if pivot is None or pivot.empty:
+            result_label.config(text=note or "No data matches the search")
             tree.delete(*tree.get_children())
             pivot_result["df"] = None
             return
@@ -227,9 +204,12 @@ def show_query_builder(wizard):
             tree.insert("", "end", text=str(idx), values=vals)
 
         pivot_result["df"] = pivot
-        pivot_result["query"] = {"metric": metric, "campaigns": sel_camps,
-                                  "sources": sel_sources, "values": sel_vals,
-                                  "agg": agg, "top_n": topn}
+        pivot_result["query"] = {"metric": metric,
+                                  "campaigns": sel_camps,
+                                  "sources": parsed["sources"],
+                                  "values": parsed["values"],
+                                  "agg": agg, "top_n": top_n, "sort": sort,
+                                  "search": search_var.get()}
 
         # Refresh the export-column selector with the pivot's columns,
         # preserving any current selection
@@ -386,9 +366,6 @@ def show_query_builder(wizard):
     tk.Label(hdr_wrap, text="Applies to Table/Chart output. Column picks apply to all outputs.",
              font=("Calibri", 7), bg=t["card"], fg=t["muted"]).pack(anchor="w", pady=(2, 0))
 
-    # Refresh button
-
-
     # Pivot table preview
     pivot_frame = tk.LabelFrame(win, text="  Data Preview  ", font=("Calibri", 10, "bold"),
                                  bg=t["card"], fg=t["card_fg"])
@@ -402,12 +379,21 @@ def show_query_builder(wizard):
 
     pivot_result = {"df": None, "query": None}
 
-    # ── Export options: column selection + header handling ──
+    # Live refresh: debounced typing (250 ms), Enter for immediate, and
+    # the order controls
+    _debounce = [None]
 
+    def _search_changed(_event=None):
+        if _debounce[0] is not None:
+            try:
+                win.after_cancel(_debounce[0])
+            except Exception:
+                logger.debug("Search debounce cancel failed", exc_info=True)
+        _debounce[0] = win.after(250, refresh_pivot)
 
-    # Auto-refresh on metric/agg change
-    for var in [metric_var, agg_var, topn_var]:
-        var.trace_add("write", lambda *a: refresh_pivot())
+    search_entry.bind("<KeyRelease>", _search_changed)
+    search_entry.bind("<Return>", lambda e: refresh_pivot())
+    for box in (agg_box, sort_box, show_box):
+        box.bind("<<ComboboxSelected>>", lambda e: refresh_pivot())
+    show_box.bind("<Return>", lambda e: refresh_pivot())
     refresh_pivot()
-
-
