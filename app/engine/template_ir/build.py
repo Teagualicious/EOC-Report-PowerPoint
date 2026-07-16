@@ -93,7 +93,7 @@ def build_from_template(template_dir, output_path, slot_values=None):
             report["shapes_copied"] += 1
         if slot_values:
             _fill_slide_slots(slide, slide_ir, ir.slot_registry,
-                              slot_values, appended, report)
+                              slot_values, appended, report, template_dir)
 
     if slot_values is not None:
         registry = ir.slot_registry
@@ -116,7 +116,7 @@ def build_from_template(template_dir, output_path, slot_values=None):
 
 
 def _fill_slide_slots(slide, slide_ir, registry, slot_values, appended,
-                      report):
+                      report, template_dir):
     """Write slot values into their placeholder runs on one built slide.
 
     Resolution is by the slot's stored placeholder text inside its own
@@ -146,6 +146,9 @@ def _fill_slide_slots(slide, slide_ir, registry, slot_values, appended,
             outcome = _inject_chart_data(wrapper, slot_values[slot])
         elif slot_type == "table_data":
             outcome = _fill_table(wrapper, slot_values[slot], report, slot)
+        elif slot_type == "image":
+            outcome = _apply_image(wrapper, slot_values[slot], slide,
+                                   template_dir)
         else:
             display = str(slot_values[slot])
             placeholder = spec.get("placeholder_text") or None
@@ -239,6 +242,8 @@ def _inject_chart_data(wrapper, payload):
     the embedded workbook change, series formatting does not. Returns
     None on success, else the unfilled reason."""
     from pptx.chart.data import CategoryChartData
+    if not isinstance(payload, dict):
+        return "mapped value is not chart data"
     if wrapper is None or not getattr(wrapper, "has_chart", False):
         return "shape is not a chart"
     chart = wrapper.chart
@@ -276,6 +281,8 @@ def _fill_table(wrapper, payload, report, slot):
     leftover data rows are cleared. Column overflow is truncated and
     noted in the report. Returns None on success, else the reason."""
     from engine.pptx_fill import _replace_in_text_frame
+    if not isinstance(payload, dict):
+        return "mapped value is not table data"
     if wrapper is None or not getattr(wrapper, "has_table", False):
         return "shape is not a table"
     rows = payload.get("rows") or []
@@ -308,6 +315,44 @@ def _fill_table(wrapper, payload, report, slot):
                     and text:
                 cell.text_frame.text = text
     return None
+
+
+def _apply_image(wrapper, payload, slide, template_dir):
+    """Fill an image slot: point the copied shape's picture at the mapped
+    image file. A shape with a blip (picture or picture fill) keeps ALL
+    its formatting — crop, rounded corners, effects — only the image part
+    changes. A plain shape (e.g. a "CLIENT LOGO" box) is replaced by a
+    picture at its exact geometry, like the classic fill engine.
+    Returns None on success, else the unfilled reason."""
+    if not isinstance(payload, dict):
+        return "mapped value is not an image"
+    if wrapper is None:
+        return "shape could not be resolved"
+    candidates = []
+    if payload.get("image_path"):
+        candidates.append(os.path.join(template_dir, payload["image_path"]))
+        candidates.append(payload["image_path"])
+    if payload.get("image_path_abs"):
+        candidates.append(payload["image_path_abs"])
+    path = next((c for c in candidates if c and os.path.isfile(c)), None)
+    if path is None:
+        return ("image file not found: "
+                f"{payload.get('image_path') or payload.get('image_path_abs')}")
+    try:
+        blip = next(wrapper._element.iter(_BLIP_TAG), None)
+        if blip is not None:
+            _image_part, rid = slide.part.get_or_add_image_part(path)
+            blip.set(_EMBED_ATTR, rid)
+            return None
+        left, top = wrapper.left, wrapper.top
+        width, height = wrapper.width, wrapper.height
+        slide.shapes.add_picture(path, left, top, width, height)
+        element = wrapper._element
+        element.getparent().remove(element)
+        return None
+    except Exception as e:
+        logger.exception("Image slot fill failed")
+        return f"image fill failed: {e}"
 
 
 def _relink_images(element, shape_ir, slide, template_dir, report):

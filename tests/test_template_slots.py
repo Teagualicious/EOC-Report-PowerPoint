@@ -441,6 +441,124 @@ def test_selection_slot_survives_reingest(tmp_path):
                    for d in deltas)
 
 
+# ── Quick Fill parity: custom text, images, date styles ──────────────────────
+
+def test_custom_text_slot_keeps_line_breaks_in_export(classified_dir,
+                                                      client_data, tmp_path):
+    """The classic mapper's custom-text export bug (literal \\n rendered
+    as whitespace) must stay dead in template-first: multi-line custom
+    text lands as REAL line breaks."""
+    ir, mapping = _mapping_for(classified_dir)
+    mapping["slots"]["client_name"] = {
+        "query": {"custom_text": "Prepared for Acme Motors\nMay 2026"},
+        "format": "text"}
+    save_slot_mapping(mapping, classified_dir)
+
+    out = str(tmp_path / "out.pptx")
+    _, report = build_mapped_report(classified_dir, out, client_data,
+                                    client_name="Acme Appliance Co")
+    assert ("client_name", "no value provided") not in report["slots_unfilled"]
+    deck = Presentation(out)
+    header = next(s for s in deck.slides[0].shapes
+                  if s.has_text_frame and "ACME MOTORS" in
+                  s.text_frame.text.upper())
+    for para in header.text_frame.paragraphs:
+        for run in para.runs:
+            assert "\n" not in run.text     # real <a:br/>, not literal \n
+    assert "MAY 2026" in header.text_frame.text.upper()
+
+
+def test_image_slot_swaps_picture_keeping_shape(tmp_path, client_data):
+    """An image slot on a picture shape swaps only the image part — the
+    shape (position, crop, effects) is the verbatim copy."""
+    pytest.importorskip("PIL")
+    from PIL import Image
+    from engine.template_ir.classify import add_slot
+
+    old_img = tmp_path / "old.png"
+    new_img = tmp_path / "new.png"
+    Image.new("RGB", (10, 10), (0, 84, 166)).save(old_img)
+    Image.new("RGB", (10, 10), (200, 30, 30)).save(new_img)
+
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_picture(str(old_img), Inches(1), Inches(1),
+                             Inches(2), Inches(1))
+    banner = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(4),
+                                    Inches(1), Inches(2), Inches(1))
+    banner.name = "Logo Box"
+    deck = str(tmp_path / "deck.pptx")
+    prs.save(deck)
+
+    store = ingest_template(deck, store_dir=str(tmp_path / "store"))
+    ir = classify_template(load_template_ir(store))
+    pic = next(s for slide_ir in ir.slides for s in slide_ir.shapes
+               if s.shape_type == "image")
+    box = next(s for slide_ir in ir.slides for s in slide_ir.shapes
+               if s.name == "Logo Box")
+    pic_slot = add_slot(ir, pic.shape_id, "", name="client logo",
+                        slot_type="image")
+    box_slot = add_slot(ir, box.shape_id, "", name="logo box image",
+                        slot_type="image")
+    save_template_ir(ir, store)
+
+    image_query = {"image_path_abs": str(new_img)}
+    mapping = new_slot_mapping(ir.template_id)
+    mapping["slots"] = {pic_slot: {"query": image_query},
+                        box_slot: {"query": image_query}}
+    save_slot_mapping(mapping, store)
+
+    out = str(tmp_path / "out.pptx")
+    _, report = build_mapped_report(store, out, client_data)
+    assert report["slots_filled"] == 2
+    built = Presentation(out)
+    pictures = [s for s in built.slides[0].shapes if s.shape_type == 13]
+    assert len(pictures) == 2               # swapped one + inserted one
+    new_bytes = open(new_img, "rb").read()
+    assert all(p.image.blob == new_bytes for p in pictures)
+    # The plain shape was replaced by a picture at its exact geometry
+    inserted = [p for p in pictures if p.left == Inches(4)]
+    assert inserted and inserted[0].width == Inches(2)
+
+
+def test_missing_image_file_is_reported(classified_dir, tmp_path):
+    from engine.template_ir.classify import add_slot
+    ir = load_template_ir(classified_dir)
+    banner = next(s for slide in ir.slides for s in slide.shapes
+                  if s.shape_type == "shape")
+    slot = add_slot(ir, banner.shape_id, "", slot_type="image")
+    save_template_ir(ir, classified_dir)
+    _, report = build_from_template(
+        classified_dir, str(tmp_path / "o.pptx"),
+        slot_values={slot: {"image_path_abs": "/nowhere/logo.png"}})
+    assert any(s == slot and "image file not found" in r
+               for s, r in report["slots_unfilled"])
+
+
+def test_date_style_format_details_apply(classified_dir, client_data):
+    ir, mapping = _mapping_for(classified_dir)
+    mapping["slots"]["client_name"] = {
+        "query": "__start_date__", "format": "date",
+        "format_details": {"format": "date", "date_style": "us_slash"}}
+    values, issues = resolve_slot_values(ir, mapping, client_data,
+                                         start_date="2026-05-01",
+                                         end_date="2026-05-31")
+    assert issues == []
+    assert values["client_name"] == "05/01/2026"
+
+
+def test_validation_flags_image_source_mismatches(classified_dir):
+    ir, mapping = _mapping_for(classified_dir)
+    mapping["slots"]["impressions"]["query"] = {"image_path": "assets/x.png"}
+    warnings = validate_slot_mapping(ir, mapping)
+    assert any("impressions" in w and "image" in w for w in warnings)
+
+
+def test_ingest_keeps_a_source_copy(classified_dir):
+    import os as _os
+    assert _os.path.isfile(_os.path.join(classified_dir, "source.pptx"))
+
+
 # ── Phase C: chart and table slots ────────────────────────────────────────────
 
 @pytest.fixture

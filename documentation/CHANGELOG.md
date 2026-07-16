@@ -39,6 +39,17 @@
   slot targets are highlighted in the shape text; each slot row shows
   its source, format, live value, and a remove button. Selection slots
   re-anchor across template re-ingests like any other.
+- **Quick Fill parity + polish** (feedback round 2): ✏ Custom Text and
+  🖼 Browse Image are sources again. Custom text persists in the
+  template's mapping (not per session) and multi-line text lands as REAL
+  line breaks in the export — the classic engine's flattened-text bug is
+  regression-tested dead here. Images copy into the template store and
+  fill by swapping the picture part, so crop/rounded corners/effects
+  survive; plain shapes (a "CLIENT LOGO" box) become a picture at their
+  exact geometry. Date slots pick their style (May 1st 2026 / 05/01/2026
+  / custom strftime…) right in the slot row. Map Slots also gains a
+  size-locked per-slide thumbnail (rendered from the source deck kept in
+  the store — PowerPoint on Windows, text summary elsewhere).
 - **Template-first AI tools**: CLI subcommands `ingest-template`,
   `template-stores`, `build-template`, and MCP tools `ingest_template`,
   `list_template_stores`, `build_from_template` (writes honor

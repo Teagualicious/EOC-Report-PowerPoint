@@ -31,6 +31,7 @@ from engine.template_ir.schema import (ASSETS_DIR_NAME, SCHEMA_VERSION,
 logger = logging.getLogger(__name__)
 
 TEMPLATE_STORE_DIR = os.path.join(WORKSPACE_DIR, "template_store")
+SOURCE_PPTX_NAME = "source.pptx"   # kept for slide previews / re-checks
 
 _CHART_TAG = qn("c:chart")
 _TABLE_TAG = qn("a:tbl")
@@ -50,6 +51,17 @@ def ingest_template(pptx_path, template_id=None, store_dir=None):
     template_dir = store_dir or os.path.join(TEMPLATE_STORE_DIR, template_id)
     assets_dir = os.path.join(template_dir, ASSETS_DIR_NAME)
     os.makedirs(assets_dir, exist_ok=True)
+
+    # Keep the source deck in the store: slide previews render from it,
+    # and it documents exactly what was ingested.
+    source_copy = os.path.join(template_dir, SOURCE_PPTX_NAME)
+    if os.path.abspath(pptx_path) != os.path.abspath(source_copy):
+        try:
+            import shutil
+            shutil.copy2(pptx_path, source_copy)
+        except OSError:
+            logger.warning("Could not keep a source copy in %s",
+                           template_dir, exc_info=True)
 
     prs = Presentation(pptx_path)
     slides = []
