@@ -21,7 +21,7 @@ from engine.template_ir import (classify_template, load_template_ir,
 from engine.template_ir.classify import (rename_slot, set_classification,
                                          set_excluded, shape_slots)
 from engine.template_ir.ingest import ingest_template, list_template_stores
-from ui.utils import fit_window
+from ui.utils import fit_window, grow_to_content
 
 logger = logging.getLogger(__name__)
 
@@ -129,24 +129,29 @@ def open_template_first(parent, theme, export_result=None):
             from mapper.slot_mapper import SlotMapperWindow
             SlotMapperWindow(win, t, store, export_result)
 
+    # Two logical rows so this compact dialog never mashes its buttons:
+    # template actions first, then what to open for the selected store
     btns = tk.Frame(win, bg=t["bg"])
-    btns.pack(fill="x", padx=20, pady=12)
+    btns.pack(fill="x", padx=20, pady=(10, 2))
     tk.Button(btns, text="Ingest New Template…", font=("Segoe UI", 10),
               bg=t["success"], fg="white", relief="flat", padx=12, pady=6,
               command=ingest_new).pack(side="left")
-    tk.Button(btns, text="Update from New Deck…", font=("Segoe UI", 9),
+    tk.Button(btns, text="Update from New Deck…", font=("Segoe UI", 10),
               bg=t["secondary"], fg=t["secondary_fg"], relief="flat",
-              padx=10, pady=6, command=update_from_deck).pack(side="left",
-                                                              padx=6)
-    tk.Button(btns, text="Review Shapes", font=("Segoe UI", 10),
+              padx=12, pady=6, command=update_from_deck).pack(side="left",
+                                                              padx=8)
+    open_row = tk.Frame(win, bg=t["bg"])
+    open_row.pack(fill="x", padx=20, pady=(2, 12))
+    tk.Button(open_row, text="Review Shapes", font=("Segoe UI", 10),
               bg=t["accent"], fg="white", relief="flat", padx=12, pady=6,
               command=review).pack(side="left")
-    tk.Button(btns, text="Map Slots →", font=("Segoe UI", 10, "bold"),
+    tk.Button(open_row, text="Map Slots →", font=("Segoe UI", 10, "bold"),
               bg="#1E6E3E", fg="white", relief="flat", padx=12, pady=6,
-              command=map_slots).pack(side="left")
-    tk.Button(btns, text="Close", font=("Segoe UI", 10), bg=t["secondary"],
-              fg=t["secondary_fg"], relief="flat", padx=12, pady=6,
-              command=win.destroy).pack(side="right")
+              command=map_slots).pack(side="left", padx=8)
+    tk.Button(open_row, text="Close", font=("Segoe UI", 10),
+              bg=t["secondary"], fg=t["secondary_fg"], relief="flat",
+              padx=12, pady=6, command=win.destroy).pack(side="right")
+    grow_to_content(win)
 
 
 class TemplateReviewWindow:
@@ -229,6 +234,7 @@ class TemplateReviewWindow:
                   fg="white", relief="flat", padx=15, pady=6,
                   command=self._save).pack(side="right", padx=6)
 
+        grow_to_content(self.window)
         self._render_slide()
 
     # ── Rendering ─────────────────────────────────────────────────────────

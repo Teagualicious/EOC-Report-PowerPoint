@@ -50,6 +50,14 @@
   / custom strftime…) right in the slot row. Map Slots also gains a
   size-locked per-slide thumbnail (rendered from the source deck kept in
   the store — PowerPoint on Windows, text summary elsewhere).
+- **Button bars no longer mash or clip** (feedback round 3): new
+  `ui.utils.grow_to_content` measures the real content size after a
+  window is built (fonts and Windows DPI included) and grows the window
+  to fit, clamped to the work area — applied to Settings, the
+  Template-First launcher, Template Review, Map Slots, and the template
+  selector. Any button added to a row in the future widens the window
+  instead of squeezing the row. The launcher's five actions also split
+  into two logical rows (template actions, then open actions).
 - **Template-first AI tools**: CLI subcommands `ingest-template`,
   `template-stores`, `build-template`, and MCP tools `ingest_template`,
   `list_template_stores`, `build_from_template` (writes honor

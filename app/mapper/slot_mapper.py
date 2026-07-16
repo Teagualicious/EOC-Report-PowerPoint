@@ -27,7 +27,7 @@ from engine.template_ir import (load_slot_mapping, load_template_ir,
 from engine.template_ir.classify import add_slot, remove_slot
 from engine.template_ir.mapping import build_mapped_report, resolve_slot_values
 from mapper.query_builder import show_query_builder
-from ui.utils import fit_window
+from ui.utils import fit_window, grow_to_content
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,7 @@ class SlotMapperWindow:
                       fg="white", relief="flat", padx=15, pady=6,
                       command=self._build_report).pack(side="right")
 
+        grow_to_content(self.window)
         self._render_slide()
 
     def _build_sidebar(self, main):
