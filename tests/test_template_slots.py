@@ -349,6 +349,98 @@ def test_excluded_shape_is_skipped_and_its_slot_reported(classified_dir,
                for s in deck.slides[0].shapes if s.shape_type != 6)
 
 
+# ── Selection-based slots (Windows feedback: target one word, not the box) ───
+
+def test_add_slot_targets_a_selection_inside_a_run(classified_dir,
+                                                   client_data, tmp_path):
+    """Highlighting "CLIENT NAME" inside "CLIENT NAME | MONTH 1ST, 2026"
+    must replace only that piece at build time."""
+    from engine.template_ir.classify import add_slot, remove_slot
+    ir = load_template_ir(classified_dir)
+    header = next(s for s in ir.slides[0].shapes
+                  if "CLIENT NAME" in s.text)
+    remove_slot(ir, "client_name")            # replace the whole-run slot
+    name = add_slot(ir, header.shape_id, "CLIENT NAME",
+                    name="Client Name")
+    assert name == "client_name"
+    assert ir.slot_registry[name]["placeholder_text"] == "CLIENT NAME"
+    save_template_ir(ir, classified_dir)
+
+    out = str(tmp_path / "out.pptx")
+    _, report = build_from_template(classified_dir, out,
+                                    slot_values={name: "ACME MOTORS"})
+    assert report["slots_filled"] == 1
+    deck = Presentation(out)
+    filled = next(s.text_frame.text for s in deck.slides[0].shapes
+                  if s.has_text_frame and "ACME MOTORS" in s.text_frame.text)
+    assert filled == "ACME MOTORS | MONTH 1ST, 2026"   # rest of line kept
+
+
+def test_two_selection_slots_share_one_run(classified_dir, tmp_path):
+    from engine.template_ir.classify import add_slot, remove_slot
+    ir = load_template_ir(classified_dir)
+    header = next(s for s in ir.slides[0].shapes
+                  if "CLIENT NAME" in s.text)
+    remove_slot(ir, "client_name")
+    add_slot(ir, header.shape_id, "CLIENT NAME", name="client")
+    add_slot(ir, header.shape_id, "MONTH 1ST, 2026", name="period")
+    save_template_ir(ir, classified_dir)
+
+    _, report = build_from_template(
+        classified_dir, str(tmp_path / "out.pptx"),
+        slot_values={"client": "ACME MOTORS", "period": "MAY 2026"})
+    assert report["slots_filled"] == 2
+    deck = Presentation(str(tmp_path / "out.pptx"))
+    assert any(s.has_text_frame
+               and s.text_frame.text == "ACME MOTORS | MAY 2026"
+               for s in deck.slides[0].shapes)
+
+
+def test_add_slot_flips_static_shape_dynamic_and_validates(classified_dir):
+    from engine.template_ir.classify import add_slot
+    ir = load_template_ir(classified_dir)
+    title = next(s for s in ir.slides[0].shapes
+                 if s.text == "Extending Your Brand's Reach")
+    assert title.classification == "static"
+    name = add_slot(ir, title.shape_id, "Brand's Reach")
+    assert title.classification == "dynamic"
+    assert ir.slot_registry[name]["placeholder_text"] == "Brand's Reach"
+
+    with pytest.raises(ValueError):          # not in the shape
+        add_slot(ir, title.shape_id, "NOT PRESENT")
+    with pytest.raises(ValueError):          # spans lines
+        add_slot(ir, title.shape_id, "Extending\nYour")
+
+
+def test_selection_slot_survives_reingest(tmp_path):
+    """A substring placeholder re-anchors on re-ingest even though no
+    single run equals it (paragraph containment, like the fill engine)."""
+    from engine.template_ir.classify import add_slot
+    from engine.template_ir.reconcile import reingest_template
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8),
+                                   Inches(0.6))
+    box.name = "Header"
+    para = box.text_frame.paragraphs[0]
+    r1 = para.add_run(); r1.text = "CLIENT NAME | "
+    r2 = para.add_run(); r2.text = "MONTH 1ST, 2026"
+    deck = str(tmp_path / "deck.pptx")
+    prs.save(deck)
+
+    store = ingest_template(deck, store_dir=str(tmp_path / "store"))
+    ir = classify_template(load_template_ir(store))
+    add_slot(ir, ir.slides[0].shapes[0].shape_id, "NAME | MONTH",
+             name="spanner")                 # spans the two runs
+    save_template_ir(ir, store)
+
+    _, deltas = reingest_template(deck, store)
+    ir = load_template_ir(store)
+    assert "spanner" in ir.slot_registry
+    assert not any(d["kind"] == "slot_dropped" and d["slot"] == "spanner"
+                   for d in deltas)
+
+
 # ── Phase C: chart and table slots ────────────────────────────────────────────
 
 @pytest.fixture

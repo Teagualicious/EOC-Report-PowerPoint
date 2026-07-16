@@ -19,7 +19,7 @@ import logging
 import os
 import shutil
 
-from engine.template_ir.classify import classify_template, extract_runs
+from engine.template_ir.classify import classify_template, find_anchor
 from engine.template_ir.ingest import ingest_template
 from engine.template_ir.schema import (TEMPLATE_JSON_NAME, load_template_ir,
                                        save_template_ir)
@@ -145,16 +145,15 @@ def _reconcile_slots(old_ir, new_ir, matches, deltas):
                                          f"shape is now unsupported "
                                          f"({shape.unsupported})"})
                 continue
-        else:
-            run = _find_run(shape, spec.get("placeholder_text", ""))
-            if run is None:
+        elif spec.get("placeholder_text"):
+            anchor = find_anchor(shape, spec["placeholder_text"])
+            if anchor is None:
                 deltas.append({"kind": "slot_dropped", "slot": name,
                                "detail": f"slot '{name}' dropped — its "
                                          "placeholder text no longer "
                                          "appears in the shape"})
                 continue
-            carried["paragraph"] = run["paragraph"]
-            carried["run"] = run["run"]
+            carried["paragraph"], carried["run"] = anchor
         final[name] = carried
 
     # Fresh suggestions: only where they don't duplicate a carried slot,
@@ -179,17 +178,6 @@ def _reconcile_slots(old_ir, new_ir, matches, deltas):
                                  f"({spec.get('type')}) — "
                                  f"{spec.get('description', '')}"})
     return final
-
-
-def _find_run(shape, placeholder_text):
-    """The first run in the shape whose text equals the stored
-    placeholder — the slot's re-anchor point. None when absent."""
-    if not placeholder_text:
-        return None
-    for run in extract_runs(shape.element_xml):
-        if run["text"] == placeholder_text:
-            return run
-    return None
 
 
 def _was_reviewed(ir):

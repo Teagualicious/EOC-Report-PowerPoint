@@ -30,6 +30,15 @@
   loud flag when the dropped slot was mapped) and newly suggested. The
   previous template.json is kept as template.prev.json as a safety net.
   In the app: Template-First launcher → "Update from New Deck…".
+- **Map Slots reworked to the classic mapper's assignment feel**
+  (Windows field feedback): data sources sit in a sidebar — click one to
+  arm it, highlight the exact text it should replace in the shape, and
+  Assign. The slot targets just the selection, so "CLIENT NAME | MONTH
+  1st, 2026" can carry a client slot AND a date slot instead of one slot
+  replacing the whole box (no selection still means whole-box). Existing
+  slot targets are highlighted in the shape text; each slot row shows
+  its source, format, live value, and a remove button. Selection slots
+  re-anchor across template re-ingests like any other.
 - **Template-first AI tools**: CLI subcommands `ingest-template`,
   `template-stores`, `build-template`, and MCP tools `ingest_template`,
   `list_template_stores`, `build_from_template` (writes honor
