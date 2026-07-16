@@ -200,9 +200,13 @@ tooling failure, so Phase A proceeded on the recommended defaults below.
 3. Store location → **`workspace/template_store/<template_id>/`
    (provisional)**: implemented as the default in
    `engine/template_ir/ingest.py`; gitignored.
-4. Pivot-driven generation merge → **deferred to Phase B (provisional)**:
-   nothing in the Phase A schema blocks either choice; decide before the
-   Phase B mapping schema freezes.
+4. Pivot-driven generation merge → **CONFIRMED by owner 2026-07-16**:
+   slot mappings reuse the FULL existing query schema — simple keys AND
+   Advanced Query Builder (pivot) queries, resolved through the same
+   `resolve_query`/`build_pivot` path the current mapper uses (fidelity
+   fixed in v1.32.0). Pivot-driven TABLE/CHART generation stays in
+   Phase C. This froze the Phase B mapping schema
+   (`engine/template_ir/mapping.py`, mapping.json schema_version 1.0).
 
 ## Phase A — DONE 2026-07-15 (all-green in CI)
 
@@ -215,6 +219,26 @@ unsupported — the builder skips them and reports (Phase C). Tests in
 build → re-ingest is equivalent (XML byte-identical modulo relationship
 ids), run formatting and image bytes survive, and skips are always
 reported. Next: Phase B (classification + review GUI + slots + mapping).
+
+## Phase B — DONE 2026-07-16 (text slots end to end)
+
+Schema v1.1 (v1.0 stores load unchanged): shapes carry
+classification/classify_reason/excluded; the template gains a
+`slot_registry` whose slots pin to shape identity + placeholder text
+(Critique 3 honored — paragraph/run indices are stored as hints only).
+`classify.py` suggests static/dynamic with reasons and names slots from
+paired all-caps labels; `mapping.py` maps slots onto the current mapper's
+query schema per confirmed open question 4, with map-time type
+validation; `build.py` writes slot values into the verbatim copies via
+`pptx_fill`'s replace machinery (multi-line → real `<a:br/>`; group
+descent) and reports slots_filled/slots_unfilled on every build. Review
+GUI (`mapper/template_review.py`) and slot-mapping GUI
+(`mapper/slot_mapper.py`, reuses the Advanced Query Builder window via
+its wizard duck-type) are thin shells over the tested helpers; entry
+points in Settings → Templates and the report template selector. Charts
+and tables classify dynamic but take no slots until Phase C; re-ingest
+reconciliation (classify_template overwrites review work if re-run) is
+Phase D as planned. Tests: `tests/test_template_slots.py`.
 
 ## Cross-references
 

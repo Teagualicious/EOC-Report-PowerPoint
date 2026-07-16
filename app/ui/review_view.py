@@ -275,7 +275,9 @@ class ReviewMixin:
         t = self.t
         win = tk.Toplevel(self.root)
         win.title("Select Template")
-        fit_window(win, 600, 420)
+        # 720: the action bar gained the Template-First button — at 600 the
+        # four buttons could squeeze off-frame (the review-screen bug class)
+        fit_window(win, 720, 420)
         win.configure(bg=t["bg"]); win.transient(self.root)
         win.grab_set(); win.lift(); win.focus_force()
 
@@ -451,6 +453,15 @@ class ReviewMixin:
                   bg=t["accent"], fg="white", relief="flat", padx=15, pady=8,
                   command=lambda: [win.destroy(), PPTXWizard(self.root, export_result, self.t)]
                   ).pack(side="left", padx=(10, 0))
+
+        def template_first():
+            from mapper.template_review import open_template_first
+            win.destroy()
+            open_template_first(self.root, self.t, export_result)
+
+        tk.Button(btn_frame, text="🧪 Template-First", font=("Segoe UI", 10),
+                  bg="#8B4513", fg="white", relief="flat", padx=15, pady=8,
+                  command=template_first).pack(side="left", padx=(10, 0))
         tk.Button(btn_frame, text="Cancel", font=("Segoe UI", 10),
                   bg=t["secondary"], fg=t["secondary_fg"], relief="flat", padx=15, pady=8,
                   command=win.destroy).pack(side="right")

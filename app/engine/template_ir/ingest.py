@@ -172,6 +172,17 @@ def _extract_image(slide, rid, assets_dir, shape_id, seq):
         return None
 
 
+def list_template_stores(store_root=None):
+    """Absolute paths of every ingested template store (dirs holding a
+    template.json), sorted by name. Used by the template-first GUIs."""
+    from engine.template_ir.schema import TEMPLATE_JSON_NAME
+    root = store_root or TEMPLATE_STORE_DIR
+    if not os.path.isdir(root):
+        return []
+    return [os.path.join(root, name) for name in sorted(os.listdir(root))
+            if os.path.isfile(os.path.join(root, name, TEMPLATE_JSON_NAME))]
+
+
 def strip_embed_ids(xml):
     """Normalize relationship ids out of shape XML so two ingests of the
     same visual content compare equal (rIds are packaging details that
