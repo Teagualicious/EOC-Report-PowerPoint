@@ -12,8 +12,10 @@ TEXT inside those verbatim copies.
 Phase A: ingest a deck into a JSON IR + assets, rebuild from verbatim
 copies, round-trip fidelity proven in CI. Phase B: classification
 suggestions + slot registry (classify), slot mappings on the current
-mapper's query schema (mapping), dynamic text build. Chart-part cloning
-is Phase C; re-ingest reconciliation is Phase D.
+mapper's query schema (mapping), dynamic text build. Phase C: chart-part
+cloning + data injection, table slots. Phase D: re-ingest reconciliation
+(reconcile) — review work carries forward across template revisions —
+plus the workflow/CLI/MCP tools.
 """
 
 from engine.template_ir.schema import (SCHEMA_VERSION, ShapeIR, SlideIR,  # noqa: F401
@@ -26,3 +28,4 @@ from engine.template_ir.mapping import (build_mapped_report,  # noqa: F401
                                         load_slot_mapping, new_slot_mapping,
                                         resolve_slot_values, save_slot_mapping,
                                         validate_slot_mapping)
+from engine.template_ir.reconcile import reingest_template  # noqa: F401

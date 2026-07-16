@@ -1,6 +1,6 @@
 # Changelog
 
-## July 16, 2026 - Template-first mapper Phase C: charts and tables
+## July 16, 2026 - Template-first mapper Phases C+D: charts, tables, template evolution, AI tools
 
 - **Charts are no longer skipped by template-first builds.** Ingest
   extracts each chart's full part (chart XML, embedded workbook,
@@ -21,8 +21,22 @@
 - Both resolve through the same `build_pivot` the builder displayed (new
   pure `pivot_to_table`/`pivot_to_chart` transforms mirror the Apply as
   Table/Chart Data outputs exactly).
-- 7 new tests; the Phase A round-trip invariant and all Phase B tests
-  pass unchanged.
+- **Template evolution (Phase D): re-ingesting an updated client deck
+  carries the review work forward.** Shapes match by persistent
+  PowerPoint id (unique name as fallback; duplicates never match — no
+  guessing); classifications, exclusions, and slot names survive; slots
+  re-anchor by their placeholder text. Only the DELTAS surface for
+  review: shapes added/removed, text changes, slots dropped (with a
+  loud flag when the dropped slot was mapped) and newly suggested. The
+  previous template.json is kept as template.prev.json as a safety net.
+  In the app: Template-First launcher → "Update from New Deck…".
+- **Template-first AI tools**: CLI subcommands `ingest-template`,
+  `template-stores`, `build-template`, and MCP tools `ingest_template`,
+  `list_template_stores`, `build_from_template` (writes honor
+  `INGESTION_MCP_READ_ONLY=1`). All thin shells over
+  `engine/workflow.py`, like the rest of the AI layer.
+- 14 new tests across Phases C+D; the Phase A round-trip invariant and
+  all Phase B tests pass unchanged.
 
 ## July 16, 2026 - Template-first mapper Phase B: classification, slots, dynamic text builds
 

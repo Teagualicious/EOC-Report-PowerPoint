@@ -228,6 +228,96 @@ def fill_deck(client_data, template_filename, output_path, client_name="",
     return {"path": path, "report": report.to_dict()}
 
 
+def ingest_template_store(pptx_path, template_id=None):
+    """Ingest a deck into the template-first store — or RE-ingest an
+    updated deck into its existing store, carrying review work forward
+    and returning the deltas (template-first Phase D).
+
+    Returns template dir/id, per-slide shape classifications, the slot
+    registry, and deltas ([] on a first ingest).
+    """
+    from config.naming import storage_key
+    from engine.template_ir import (classify_template, ingest_template,
+                                    load_template_ir, reingest_template,
+                                    save_template_ir)
+    from engine.template_ir.ingest import TEMPLATE_STORE_DIR
+    from engine.template_ir.schema import TEMPLATE_JSON_NAME
+
+    if not os.path.isfile(pptx_path):
+        raise FileNotFoundError(f"No such file: {pptx_path}")
+    template_id = template_id or storage_key(
+        os.path.splitext(os.path.basename(pptx_path))[0], replace_dots=True)
+    template_dir = os.path.join(TEMPLATE_STORE_DIR, template_id)
+
+    if os.path.isfile(os.path.join(template_dir, TEMPLATE_JSON_NAME)):
+        template_dir, deltas = reingest_template(pptx_path, template_dir)
+    else:
+        template_dir = ingest_template(pptx_path, template_id=template_id)
+        ir = classify_template(load_template_ir(template_dir))
+        save_template_ir(ir, template_dir)
+        deltas = []
+
+    ir = load_template_ir(template_dir)
+    shapes = [{"shape_id": s.shape_id, "name": s.name,
+               "type": s.shape_type, "slide": slide.slide_index + 1,
+               "classification": s.classification,
+               "reason": s.classify_reason, "excluded": s.excluded}
+              for slide in ir.slides for s in slide.shapes]
+    return _native({"template_id": ir.template_id,
+                    "template_dir": template_dir,
+                    "shapes": shapes,
+                    "slots": ir.slot_registry,
+                    "deltas": deltas})
+
+
+def list_template_stores():
+    """Ingested template-first stores and whether each has a slot mapping."""
+    from engine.template_ir import load_slot_mapping, load_template_ir
+    from engine.template_ir.ingest import list_template_stores as _stores
+    out = []
+    for store in _stores():
+        try:
+            ir = load_template_ir(store)
+        except Exception:
+            logger.warning("Unreadable template store: %s", store,
+                           exc_info=True)
+            continue
+        out.append({"template_id": ir.template_id, "template_dir": store,
+                    "slots": len(ir.slot_registry),
+                    "has_mapping": load_slot_mapping(store) is not None})
+    return out
+
+
+def build_template_report(client_data, template, output_path,
+                          client_name="", start_date="", end_date=""):
+    """Build a deck from a template-first store (template-first pipeline;
+    the store must have a saved slot mapping).
+
+    ``template`` is a store directory path or a template_id under the
+    default store. Returns the saved path and the build report (shapes
+    copied, charts cloned, slots filled/unfilled, skips, notes).
+    """
+    from engine.template_ir.ingest import TEMPLATE_STORE_DIR
+    from engine.template_ir.mapping import build_mapped_report
+
+    template_dir = template if os.path.isdir(template) \
+        else os.path.join(TEMPLATE_STORE_DIR, template)
+    if not os.path.isdir(template_dir):
+        raise FileNotFoundError(
+            f"No ingested template store named '{template}' — run "
+            "ingest_template first.")
+
+    if not start_date or not end_date:
+        for d in client_data:
+            start_date = start_date or d.get("start_date", "")
+            end_date = end_date or d.get("end_date", "")
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    path, report = build_mapped_report(template_dir, output_path,
+                                       client_data, client_name,
+                                       start_date, end_date)
+    return _native({"path": path, "report": report})
+
+
 def query_metric(client_data, metric, breakdown="all", agg="sum",
                  metric_filter="all", client_name="", start_date="",
                  end_date=""):

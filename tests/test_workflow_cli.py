@@ -196,7 +196,8 @@ def test_cli_and_mcp_share_the_workflow_engine():
     for fn in ("parse_files", "client_dataset", "kpis_for",
                "export_workbook", "fill_deck", "query_metric",
                "list_campaigns", "list_platforms", "list_templates",
-               "scan_export"):
+               "scan_export", "ingest_template_store",
+               "list_template_stores", "build_template_report"):
         assert hasattr(wf, fn)
     mcp_src = open(os.path.join(PROJECT_ROOT, "app", "mcp_server.py"),
                    encoding="utf-8").read()

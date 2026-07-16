@@ -261,6 +261,24 @@ python-pptx sufficed — the Aspose.Slides question stays closed unless
 real templates surface chart content it cannot handle (SmartArt remains
 out of scope, detected as "graphicFrame content").
 
+## Phase D — DONE 2026-07-16 (template evolution + AI tools; ships with C)
+
+Critique 3 implemented in `engine/template_ir/reconcile.py`: re-ingest
+matches shapes by unique persistent id with unique-name fallback
+(duplicates never match), carries classifications/exclusions/slot names
+forward, re-anchors slots by placeholder text, and surfaces only the
+deltas — shapes added/removed/text-changed, slots dropped (extra-loud
+when mapped) and newly suggested. The pre-update template.json survives
+as template.prev.json. Unreviewed Phase A stores are detected and take
+fresh suggestions instead of a bogus all-static carry; re-ingesting an
+identical deck produces zero deltas (test-locked invariant). The AI
+tools land per the original synergy goal: `ingest_template` /
+`list_template_stores` / `build_from_template` on the MCP server (writes
+gated by read-only mode) and `ingest-template` / `template-stores` /
+`build-template` on the CLI, all thin shells over `engine/workflow.py`.
+With this, all four phases of the suggested phasing are shipped; the
+remaining gate to production default is the month-end trial (Critique 6).
+
 ## Cross-references
 
 - Proposal: `../proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md`
