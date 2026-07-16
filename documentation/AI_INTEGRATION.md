@@ -55,6 +55,14 @@ Tools exposed:
 | `query_metric` | Advanced metric query (breakdowns, filters, agg) |
 | `export_workbook` | Write the unified Search/Data Excel workbook |
 | `fill_template` | Fill a mapped PowerPoint deck, returns the fill report |
+| `list_template_stores` | Ingested template-first stores + slot/mapping status |
+| `ingest_template` | Ingest a deck into the template-first store (re-ingest carries review work forward and returns deltas) |
+| `build_from_template` | Build a fresh deck from a mapped template-first store (verbatim branding; text/chart/table slots) |
+
+The CLI mirrors these as `ingest-template`, `template-stores`, and
+`build-template` subcommands (`python app/cli.py <command> --help`).
+`ingest_template` and `build_from_template` write to the workspace/output
+and are disabled by `INGESTION_MCP_READ_ONLY=1`, like the other writers.
 
 Set the environment variable `INGESTION_MCP_READ_ONLY=1` on the server to
 disable the two writing tools (analysis-only mode for wider rollouts).

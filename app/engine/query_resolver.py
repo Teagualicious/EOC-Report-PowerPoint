@@ -138,31 +138,9 @@ def resolve_query(query, client_data, client_name="", start_date="", end_date=""
     is_builder_query = any(k in query for k in
                            ("campaigns", "sources", "values", "top_n"))
 
-    # Collect data into DataFrame
-    rows = []
-    for data in client_data:
-        for mdata in data.get("campaign_metrics", {}).values():
-            mn = mdata.get("universal_name", "")
-            mv = mdata.get("value", 0)
-            camp = mdata.get("campaign_name", "")
-            if mn and isinstance(mv, Real) and not isinstance(mv, bool):
-                rows.append({"campaign": camp, "metric": mn, "value": mv,
-                             "source": "campaign", "level_value": ""})
-        for ld in data.get("level_data", []):
-            mn = ld.get("metric_name", "")
-            mv = ld.get("metric_value", 0)
-            ml = ld.get("metric_level", "")
-            camp = ld.get("_campaign", "")
-            prefix = ml.split(":")[0] if ":" in ml else ml
-            lv = ml.split(":", 1)[1] if ":" in ml else ""
-            if mn and isinstance(mv, Real) and not isinstance(mv, bool):
-                rows.append({"campaign": camp, "metric": mn, "value": mv,
-                             "source": prefix, "level_value": lv})
-
-    if not rows:
+    df = collect_query_df(client_data)
+    if df is None:
         return 0
-
-    df = pd.DataFrame(rows)
 
     if is_builder_query:
         # Re-resolve through the SAME pivot the builder previewed so the
@@ -242,6 +220,54 @@ def resolve_query(query, client_data, client_name="", start_date="", end_date=""
 
     item = getattr(result, "item", None)
     return item() if callable(item) else result
+
+
+def collect_query_df(client_data):
+    """The long-format DataFrame every query resolves against (campaign
+    rows + breakdown-level rows), or None when there is no numeric data."""
+    rows = []
+    for data in client_data:
+        for mdata in data.get("campaign_metrics", {}).values():
+            mn = mdata.get("universal_name", "")
+            mv = mdata.get("value", 0)
+            camp = mdata.get("campaign_name", "")
+            if mn and isinstance(mv, Real) and not isinstance(mv, bool):
+                rows.append({"campaign": camp, "metric": mn, "value": mv,
+                             "source": "campaign", "level_value": ""})
+        for ld in data.get("level_data", []):
+            mn = ld.get("metric_name", "")
+            mv = ld.get("metric_value", 0)
+            ml = ld.get("metric_level", "")
+            camp = ld.get("_campaign", "")
+            prefix = ml.split(":")[0] if ":" in ml else ml
+            lv = ml.split(":", 1)[1] if ":" in ml else ""
+            if mn and isinstance(mv, Real) and not isinstance(mv, bool):
+                rows.append({"campaign": camp, "metric": mn, "value": mv,
+                             "source": prefix, "level_value": lv})
+    if not rows:
+        return None
+    return pd.DataFrame(rows)
+
+
+def resolve_query_payload(query, client_data, kind):
+    """Resolve a builder query to a table or chart payload ("kind") by
+    re-running the SAME pivot the builder displayed at apply time — the
+    template-first path for table_data/chart_data slots. Returns the
+    payload dict, or None when no rows match."""
+    if not isinstance(query, dict):
+        return None
+    from engine.pivot import (build_pivot, pivot_to_chart, pivot_to_table)
+    df = collect_query_df(client_data)
+    if df is None:
+        return None
+    pivot, _note = build_pivot(
+        df, query.get("metric", ""), query.get("agg", "sum"),
+        str(query.get("top_n", "all") or "all"),
+        query.get("campaigns") or [], query.get("sources") or [],
+        query.get("values") or [])
+    if pivot is None or pivot.empty:
+        return None
+    return pivot_to_table(pivot) if kind == "table" else pivot_to_chart(pivot)
 
 
 def _get_sources(client_data):

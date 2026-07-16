@@ -11,7 +11,9 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 
-SCHEMA_VERSION = "1.1"   # 1.1: classification reasons, excluded flag, slot registry
+SCHEMA_VERSION = "1.1"   # 1.1: classification reasons, excluded flag, slot
+                         # registry, chart part assets (all Phase B/C; 1.0
+                         # stores load unchanged)
 
 TEMPLATE_JSON_NAME = "template.json"
 ASSETS_DIR_NAME = "assets"
@@ -32,6 +34,10 @@ class ShapeIR:
     element_xml: str
     text: str = ""                   # plain-text snapshot
     image_rels: dict = field(default_factory=dict)  # embed rId -> asset rel path
+    # Chart shapes: extracted part assets for build-time cloning —
+    # {"xml": rel path, "workbook": rel path|None,
+    #  "extra": [[reltype, content_type, rel path], ...]} (colors/style)
+    chart_part: dict = field(default_factory=dict)
     classification: str = "static"   # static|dynamic (suggested, user-reviewed)
     classify_reason: str = ""        # why the heuristic suggested it
     excluded: bool = False           # user removed it entirely — builder skips

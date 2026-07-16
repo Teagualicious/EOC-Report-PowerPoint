@@ -240,6 +240,45 @@ and tables classify dynamic but take no slots until Phase C; re-ingest
 reconciliation (classify_template overwrites review work if re-run) is
 Phase D as planned. Tests: `tests/test_template_slots.py`.
 
+## Phase C — DONE 2026-07-16 (charts and tables, same release as B)
+
+Exactly the Critique 2 strategy: ingest extracts the whole chart part
+(chart XML + embedded workbook + chartColors/chartStyle parts) into the
+template's assets; the builder clones the part into the new package with
+relationships rewired and points the copied graphicFrame at it. Data
+injection uses python-pptx's `chart.replace_data`, whose series rewriter
+replaces only each series' cached `c:tx`/`c:cat`/`c:val` and the
+embedded workbook — "all series-level formatting is left undisturbed"
+(verified by a test asserting a brand series color survives injection).
+The original cached number format is carried into the new caches so
+source-linked data labels don't drift to General. XY/bubble charts are
+detected and reported as uninjectable (category charts only). Table
+slots fill below the template's branded header row, cloning the last row
+on overflow and clearing leftovers; truncation is reported. Payloads
+resolve through the same `build_pivot` the builder displayed
+(`pivot_to_table`/`pivot_to_chart`). **Library checkpoint resolved:**
+python-pptx sufficed — the Aspose.Slides question stays closed unless
+real templates surface chart content it cannot handle (SmartArt remains
+out of scope, detected as "graphicFrame content").
+
+## Phase D — DONE 2026-07-16 (template evolution + AI tools; ships with C)
+
+Critique 3 implemented in `engine/template_ir/reconcile.py`: re-ingest
+matches shapes by unique persistent id with unique-name fallback
+(duplicates never match), carries classifications/exclusions/slot names
+forward, re-anchors slots by placeholder text, and surfaces only the
+deltas — shapes added/removed/text-changed, slots dropped (extra-loud
+when mapped) and newly suggested. The pre-update template.json survives
+as template.prev.json. Unreviewed Phase A stores are detected and take
+fresh suggestions instead of a bogus all-static carry; re-ingesting an
+identical deck produces zero deltas (test-locked invariant). The AI
+tools land per the original synergy goal: `ingest_template` /
+`list_template_stores` / `build_from_template` on the MCP server (writes
+gated by read-only mode) and `ingest-template` / `template-stores` /
+`build-template` on the CLI, all thin shells over `engine/workflow.py`.
+With this, all four phases of the suggested phasing are shipped; the
+remaining gate to production default is the month-end trial (Critique 6).
+
 ## Cross-references
 
 - Proposal: `../proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md`

@@ -51,8 +51,12 @@ mcp = FastMCP(
         "Workflow: list_platforms -> (scan_export for new layouts) -> "
         "list_campaigns(files) -> get_kpis / query_metric to analyze, "
         "export_workbook for the searchable Excel report, fill_template "
-        "for the mapped PowerPoint deck. Files are given as "
-        "[{path, platform}] where platform names a saved app config."),
+        "for the mapped PowerPoint deck. Template-first pipeline: "
+        "ingest_template ingests a client deck into a reviewable store "
+        "(re-ingest returns review deltas), list_template_stores shows "
+        "stores, build_from_template builds a fresh deck from a mapped "
+        "store. Files are given as [{path, platform}] where platform "
+        "names a saved app config."),
 )
 
 
@@ -87,6 +91,13 @@ def scan_export(path: str) -> list:
     """Inspect an export file's structure (sheets, headers, sample row)
     before a platform config exists for it."""
     return workflow.scan_export(path)
+
+
+@mcp.tool()
+def list_template_stores() -> list:
+    """List ingested template-first stores (id, dir, slot count, whether
+    a slot mapping is saved)."""
+    return workflow.list_template_stores()
 
 
 @mcp.tool()
@@ -151,6 +162,30 @@ if not READ_ONLY:
                                   start_date, end_date)
         result = workflow.fill_deck(data, template, output_path, client,
                                     start_date, end_date)
+        result["failures"] = failures
+        return result
+
+    @mcp.tool()
+    def ingest_template(pptx_path: str, template_id: str = "") -> dict:
+        """Ingest a client deck into the template-first store: shapes are
+        auto-classified static/dynamic and placeholder runs become named
+        slots (a human reviews in the app). Re-ingesting an updated deck
+        carries the review forward and returns the deltas."""
+        return workflow.ingest_template_store(pptx_path,
+                                              template_id or None)
+
+    @mcp.tool()
+    def build_from_template(files: list, client: str, template: str,
+                            output_path: str, campaigns: list = None,
+                            start_date: str = "", end_date: str = "") -> dict:
+        """Build a fresh deck from a mapped template-first store (verbatim
+        branding, slot values resolved from the client's data; charts and
+        tables injected). Returns the build report — slots filled and
+        unfilled, shapes skipped, notes."""
+        data, failures = _dataset(files, client, campaigns,
+                                  start_date, end_date)
+        result = workflow.build_template_report(data, template, output_path,
+                                                client, start_date, end_date)
         result["failures"] = failures
         return result
 

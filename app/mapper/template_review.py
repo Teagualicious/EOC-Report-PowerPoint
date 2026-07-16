@@ -97,6 +97,32 @@ def open_template_first(parent, theme, export_result=None):
         if store:
             TemplateReviewWindow(win, t, store, export_result)
 
+    def update_from_deck():
+        store = selected_store()
+        if not store:
+            return
+        path = filedialog.askopenfilename(
+            parent=win, title="Select the client's UPDATED PowerPoint",
+            filetypes=[("PowerPoint", "*.pptx")])
+        if not path:
+            return
+        from engine.template_ir import reingest_template
+        try:
+            _, deltas = reingest_template(path, store)
+        except Exception as e:
+            logger.exception("Template re-ingest failed: %s", path)
+            messagebox.showerror("Update Failed", str(e), parent=win)
+            return
+        refresh()
+        details = [d["detail"] for d in deltas]
+        messagebox.showinfo(
+            "Template Updated",
+            "Review work carried forward.\n\nWhat changed:\n• "
+            + "\n• ".join(details) if details else
+            "Template updated — nothing changed that needs review.",
+            parent=win)
+        TemplateReviewWindow(win, t, store, export_result)
+
     def map_slots():
         store = selected_store()
         if store:
@@ -108,9 +134,13 @@ def open_template_first(parent, theme, export_result=None):
     tk.Button(btns, text="Ingest New Template…", font=("Segoe UI", 10),
               bg=t["success"], fg="white", relief="flat", padx=12, pady=6,
               command=ingest_new).pack(side="left")
+    tk.Button(btns, text="Update from New Deck…", font=("Segoe UI", 9),
+              bg=t["secondary"], fg=t["secondary_fg"], relief="flat",
+              padx=10, pady=6, command=update_from_deck).pack(side="left",
+                                                              padx=6)
     tk.Button(btns, text="Review Shapes", font=("Segoe UI", 10),
               bg=t["accent"], fg="white", relief="flat", padx=12, pady=6,
-              command=review).pack(side="left", padx=6)
+              command=review).pack(side="left")
     tk.Button(btns, text="Map Slots →", font=("Segoe UI", 10, "bold"),
               bg="#1E6E3E", fg="white", relief="flat", padx=12, pady=6,
               command=map_slots).pack(side="left")

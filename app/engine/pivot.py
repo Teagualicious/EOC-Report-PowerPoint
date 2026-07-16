@@ -87,3 +87,35 @@ def pivot_total(pivot):
              else pivot.iloc[:, -1].sum())
     item = getattr(total, "item", None)
     return item() if callable(item) else total
+
+
+def _cell(value):
+    """One table cell, formatted the way the builder's Apply as Table
+    renders it (query_builder.apply_value)."""
+    from engine.pptx_formats import _coerce_number
+    value = _coerce_number(value)   # numpy scalars fail isinstance(int/float)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return f"{value:,.0f}"
+    return str(value)
+
+
+def pivot_to_table(pivot):
+    """A pivot as table-fill payload: {"headers": [...], "rows": [[...]]} —
+    label column first, then every pivot column, cells formatted like the
+    builder's Apply as Table output."""
+    label = pivot.index.name or "Label"
+    headers = [str(label)] + [str(c) for c in pivot.columns]
+    rows = [[str(idx)] + [_cell(row[c]) for c in pivot.columns]
+            for idx, row in pivot.iterrows()]
+    return {"headers": headers, "rows": rows}
+
+
+def pivot_to_chart(pivot):
+    """A pivot as chart-data payload: {"categories": [...], "series":
+    [{"name", "values"}, ...]} — one series per pivot column, "Total"
+    excluded, matching the builder's Apply as Chart Data output."""
+    categories = [str(i) for i in pivot.index]
+    columns = [c for c in pivot.columns if c != "Total"] or list(pivot.columns)
+    series = [{"name": str(c), "values": [float(v) for v in pivot[c]]}
+              for c in columns]
+    return {"categories": categories, "series": series}

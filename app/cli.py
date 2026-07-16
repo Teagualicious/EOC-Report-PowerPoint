@@ -20,6 +20,10 @@ Examples (from the project root):
         --output "output/Acme Appliance Co/June_Report.pptx"
     python app/cli.py query --file "input/june_export.xlsx=Architect" \
         --client "Acme Appliance Co" --metric Impressions --breakdown zip
+    python app/cli.py ingest-template --pptx "input/Client Deck.pptx"
+    python app/cli.py build-template --file "input/june_export.xlsx=Architect" \
+        --client "Acme Appliance Co" --template client_deck \
+        --output "output/Acme Appliance Co/June_Report.pptx"
 
 ``--file`` may repeat and uses ``path=Platform`` (the platform must be
 configured in the app first). ``--campaigns`` limits a client to specific
@@ -133,6 +137,26 @@ def cmd_query(args):
     return result
 
 
+def cmd_ingest_template(args):
+    from engine import workflow
+    return workflow.ingest_template_store(args.pptx, args.template_id)
+
+
+def cmd_template_stores(_args):
+    from engine import workflow
+    return workflow.list_template_stores()
+
+
+def cmd_build_template(args):
+    from engine import workflow
+    parsed, failures = _parsed_or_fail(args)
+    result = workflow.build_template_report(
+        _client_data(args, parsed), args.template, args.output, args.client,
+        args.start or "", args.end or "")
+    result["failures"] = failures
+    return result
+
+
 def _add_file_args(p, client_required=True):
     p.add_argument("--file", action="append", required=True,
                    metavar="PATH=PLATFORM",
@@ -192,6 +216,27 @@ def build_parser():
     p.add_argument("--filter", default="all",
                    help="campaign name or level value to filter on")
     p.set_defaults(fn=cmd_query)
+
+    p = sub.add_parser("ingest-template",
+                       help="ingest (or re-ingest) a deck into the "
+                            "template-first store; re-ingest returns the "
+                            "review deltas")
+    p.add_argument("--pptx", required=True, help="path to the client .pptx")
+    p.add_argument("--template-id",
+                   help="store id (default: derived from the filename)")
+    p.set_defaults(fn=cmd_ingest_template)
+
+    sub.add_parser("template-stores",
+                   help="list ingested template-first stores"
+                   ).set_defaults(fn=cmd_template_stores)
+
+    p = sub.add_parser("build-template",
+                       help="build a deck from a mapped template-first store")
+    _add_file_args(p)
+    p.add_argument("--template", required=True,
+                   help="template store id or directory path")
+    p.add_argument("--output", required=True, help="output .pptx path")
+    p.set_defaults(fn=cmd_build_template)
     return parser
 
 

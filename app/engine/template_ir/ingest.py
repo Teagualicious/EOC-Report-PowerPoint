@@ -3,8 +3,11 @@
 Every shape's ORIGINAL XML is stored verbatim (the build-time render
 source); images referenced by the XML are extracted into the template's
 assets/ directory and recorded per relationship id so the builder can
-re-target them. Charts are detected and marked unsupported for Phase A —
-the builder skips them loudly instead of producing a broken deck.
+re-target them. Chart shapes additionally get their chart PART extracted
+(chart XML + embedded workbook + colors/style parts) so the builder can
+clone the part wholesale — per the review doc, cloning is the only path
+that keeps chart styling intact. A chart whose part cannot be extracted
+is marked unsupported and skipped loudly at build.
 
 Template stores live under workspace/ (client branding never enters the
 repo — root CLAUDE.md data hygiene).
@@ -34,6 +37,7 @@ _TABLE_TAG = qn("a:tbl")
 _BLIP_TAG = qn("a:blip")
 _EMBED_ATTR = qn("r:embed")
 _LINK_ATTR = qn("r:link")
+_RID_ATTR = qn("r:id")
 
 
 def ingest_template(pptx_path, template_id=None, store_dir=None):
@@ -107,6 +111,12 @@ def _ingest_shape(shape, slide, slide_idx, z_order, assets_dir):
 
     shape_type, unsupported = _classify_element(element, shape)
 
+    chart_part = {}
+    if shape_type == "chart":
+        chart_part = _extract_chart_part(element, slide, assets_dir, shape_id)
+        if not chart_part:
+            unsupported = "chart part could not be extracted"
+
     # Extract every embedded image the XML references (covers pictures,
     # picture fills, and pictures nested inside groups) and remember which
     # relationship id used it so the builder can re-target.
@@ -128,7 +138,7 @@ def _ingest_shape(shape, slide, slide_idx, z_order, assets_dir):
     return ShapeIR(shape_id=shape_id, shape_uid=uid, name=shape.name,
                    shape_type=shape_type, z_order=z_order, geometry=geometry,
                    element_xml=xml, text=text, image_rels=image_rels,
-                   unsupported=unsupported)
+                   chart_part=chart_part, unsupported=unsupported)
 
 
 def _classify_element(element, shape):
@@ -136,10 +146,7 @@ def _classify_element(element, shape):
     tag = etree.QName(element).localname
     if tag == "graphicFrame":
         if element.find(f".//{_CHART_TAG}") is not None:
-            # Chart parts carry their own XML + embedded workbook and need
-            # part-level cloning — Phase C. Copying just the frame XML would
-            # leave a dangling relationship and a deck PowerPoint "repairs".
-            return "chart", "chart (template-first Phase C)"
+            return "chart", None       # part extracted separately (Phase C)
         if element.find(f".//{_TABLE_TAG}") is not None:
             return "table", None       # a:tbl is self-contained — copies fine
         return "other", "graphicFrame content (SmartArt/OLE?)"
@@ -170,6 +177,42 @@ def _extract_image(slide, rid, assets_dir, shape_id, seq):
         logger.warning("Could not extract image %s for %s", rid, shape_id,
                        exc_info=True)
         return None
+
+
+def _extract_chart_part(element, slide, assets_dir, shape_id):
+    """Save the chart part behind a chart graphicFrame — its XML, embedded
+    workbook, and auxiliary parts (chartColors/chartStyle) — into assets/.
+    Returns the ShapeIR.chart_part dict, or {} when extraction fails."""
+    from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+    try:
+        cchart = element.find(f".//{_CHART_TAG}")
+        rid = cchart.get(_RID_ATTR)
+        part = slide.part.related_part(rid)
+
+        def save(suffix, blob):
+            filename = f"{shape_id}_{suffix}"
+            with open(os.path.join(assets_dir, filename), "wb") as f:
+                f.write(blob)
+            return f"{ASSETS_DIR_NAME}/{filename}"
+
+        info = {"xml": save("chart.xml", part.blob), "workbook": None,
+                "extra": []}
+        n = 0
+        for rel in part.rels.values():
+            if rel.is_external:
+                continue
+            if rel.reltype == RT.PACKAGE:
+                info["workbook"] = save("chart.xlsx", rel.target_part.blob)
+            else:                       # chartColors/chartStyle etc.
+                n += 1
+                info["extra"].append(
+                    [rel.reltype, rel.target_part.content_type,
+                     save(f"chart_aux{n}.xml", rel.target_part.blob)])
+        return info
+    except Exception:
+        logger.warning("Could not extract chart part for %s", shape_id,
+                       exc_info=True)
+        return {}
 
 
 def list_template_stores(store_root=None):

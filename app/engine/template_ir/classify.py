@@ -120,9 +120,9 @@ def _suggest_slot_name(run, all_runs, reason):
 def _classify_shape(shape):
     """(classification, reason, dynamic_runs, all_runs) for one ShapeIR."""
     if shape.shape_type == "chart":
-        return "dynamic", "charts always receive mapped data (Phase C)", [], []
+        return "dynamic", "charts always receive mapped data", [], []
     if shape.shape_type == "table":
-        return "dynamic", "tables always receive mapped data (Phase C)", [], []
+        return "dynamic", "tables always receive mapped data", [], []
     if shape.shape_type == "image":
         return "static", "logo or brand image", [], []
 
@@ -157,6 +157,9 @@ def classify_template(ir):
             shape.classification = classification
             shape.classify_reason = reason
             shape.slot_name = None
+            if shape.shape_type in ("chart", "table"):
+                _add_frame_slot(ir, slide, shape, used)
+                continue
             for run, run_reason, slot_type in dynamic_runs:
                 name = _unique_name(
                     _suggest_slot_name(run, all_runs, run_reason), used)
@@ -173,6 +176,28 @@ def classify_template(ir):
                 if shape.slot_name is None:
                     shape.slot_name = name
     return ir
+
+
+def _add_frame_slot(ir, slide, shape, used):
+    """One whole-shape slot for a chart or table (Phase C). Charts whose
+    part could not be extracted get none — they cannot be built."""
+    if shape.unsupported:
+        return
+    slot_type = "chart_data" if shape.shape_type == "chart" else "table_data"
+    name = _unique_name(sanitize_slot_name(shape.name), used)
+    ir.slot_registry[name] = {
+        "type": slot_type,
+        "description": f"{shape.shape_type} \"{shape.name}\" — map an "
+                       "Advanced Query Builder query (Apply as "
+                       f"{'Chart Data' if slot_type == 'chart_data' else 'Table'})",
+        "slide_index": slide.slide_index,
+        "shape_id": shape.shape_id,
+        "shape_uid": shape.shape_uid,
+        "placeholder_text": "",
+        "paragraph": None,
+        "run": None,
+    }
+    shape.slot_name = name
 
 
 # ── Review-GUI mutations (pure, headlessly tested) ───────────────────────────
@@ -204,7 +229,10 @@ def set_classification(ir, shape_id, classification):
             del ir.slot_registry[name]
         shape.slot_name = None
         return
-    if shape_slots(ir, shape_id) or shape.shape_type in ("chart", "table"):
+    if shape_slots(ir, shape_id):
+        return
+    if shape.shape_type in ("chart", "table"):
+        _add_frame_slot(ir, slide, shape, set(ir.slot_registry))
         return
     runs = extract_runs(shape.element_xml)
     used = set(ir.slot_registry)
@@ -232,6 +260,90 @@ def set_classification(ir, shape_id, classification):
         }
         if shape.slot_name is None:
             shape.slot_name = name
+
+
+def paragraph_texts(element_xml):
+    """Each paragraph's joined run text, in document order — the exact
+    strings the fill engine matches placeholders against."""
+    paragraphs = {}
+    for run in extract_runs(element_xml):
+        paragraphs.setdefault(run["paragraph"], []).append(run["text"])
+    return ["".join(texts) for _, texts in sorted(paragraphs.items())]
+
+
+def find_anchor(shape, placeholder_text):
+    """(paragraph, run) hints for a placeholder inside a shape: the exact
+    run when one matches, else the paragraph whose joined text contains
+    it (the fill engine matches within a paragraph, across runs). None
+    when the text is absent."""
+    if not placeholder_text:
+        return None
+    runs = extract_runs(shape.element_xml)
+    for run in runs:
+        if run["text"] == placeholder_text:
+            return run["paragraph"], run["run"]
+    for index, text in enumerate(paragraph_texts(shape.element_xml)):
+        if placeholder_text in text:
+            first = next((r["run"] for r in runs
+                          if r["paragraph"] == index), 0)
+            return index, first
+    return None
+
+
+def add_slot(ir, shape_id, placeholder_text, name=None, slot_type="text"):
+    """Create a slot from a text SELECTION in the slot mapper — the
+    placeholder is exactly the selected substring, so fills replace only
+    that piece (several slots can share one run: "CLIENT NAME | MONTH
+    1st" can carry a client slot and a date slot). An empty selection
+    targets the whole box. Assigning to a static shape flips it dynamic.
+
+    Returns the slot's final (unique, sanitized) name. Raises ValueError
+    for selections that span lines or don't appear in the shape.
+    """
+    slide, shape = _find_shape(ir, shape_id)
+    placeholder_text = (placeholder_text or "").strip()
+    anchor = None
+    if placeholder_text:
+        if any(ch in placeholder_text for ch in "\n\v\r"):
+            raise ValueError("Select within a single line — a selection "
+                             "across lines can't be matched at fill time.")
+        anchor = find_anchor(shape, placeholder_text)
+        if anchor is None:
+            raise ValueError("That text isn't in this shape anymore — "
+                             "reselect and try again.")
+    if shape.classification != "dynamic":
+        shape.classification = "dynamic"
+        shape.classify_reason = "assigned in slot mapper"
+    name = _unique_name(
+        sanitize_slot_name(name or placeholder_text or shape.name,
+                           max_words=8) or "slot",
+        set(ir.slot_registry))
+    ir.slot_registry[name] = {
+        "type": slot_type,
+        "description": (f"fills \"{placeholder_text}\"" if placeholder_text
+                        else "fills the whole text box"),
+        "slide_index": slide.slide_index,
+        "shape_id": shape.shape_id,
+        "shape_uid": shape.shape_uid,
+        "placeholder_text": placeholder_text,
+        "paragraph": anchor[0] if anchor else None,
+        "run": anchor[1] if anchor else None,
+    }
+    if shape.slot_name is None:
+        shape.slot_name = name
+    return name
+
+
+def remove_slot(ir, name):
+    """Delete a slot (slot-mapper ✕). Unknown names raise KeyError."""
+    spec = ir.slot_registry.pop(name)
+    for slide in ir.slides:
+        for shape in slide.shapes:
+            if shape.slot_name == name:
+                shape.slot_name = next(
+                    (n for n, s in ir.slot_registry.items()
+                     if s.get("shape_id") == shape.shape_id), None)
+    return spec
 
 
 def set_excluded(ir, shape_id, excluded):

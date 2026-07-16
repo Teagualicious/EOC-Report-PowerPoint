@@ -1,5 +1,52 @@
 # Changelog
 
+## July 16, 2026 - Template-first mapper Phases C+D: charts, tables, template evolution, AI tools
+
+- **Charts are no longer skipped by template-first builds.** Ingest
+  extracts each chart's full part (chart XML, embedded workbook,
+  chartColors/chartStyle parts); the builder clones the part wholesale
+  with relationships rewired — a rebuilt deck's charts keep their exact
+  styling and "Edit Data" still works.
+- **Chart slots** (`chart_data`): map an Advanced Query Builder query
+  applied as Chart Data; the build injects categories/series through
+  python-pptx's cache rewriter, which touches only each series' cached
+  values — series colors, data labels, axes, legend all keep the
+  template's formatting. The embedded workbook is updated to match.
+  XY/bubble charts are detected and reported (category charts only).
+- **Table slots** (`table_data`): map a builder query applied as Table;
+  data rows fill beneath the template's own branded header row, the last
+  row is cloned when the data outgrows the table (formatting preserved),
+  leftover rows are cleared, and dropped columns are reported — nothing
+  silent.
+- Both resolve through the same `build_pivot` the builder displayed (new
+  pure `pivot_to_table`/`pivot_to_chart` transforms mirror the Apply as
+  Table/Chart Data outputs exactly).
+- **Template evolution (Phase D): re-ingesting an updated client deck
+  carries the review work forward.** Shapes match by persistent
+  PowerPoint id (unique name as fallback; duplicates never match — no
+  guessing); classifications, exclusions, and slot names survive; slots
+  re-anchor by their placeholder text. Only the DELTAS surface for
+  review: shapes added/removed, text changes, slots dropped (with a
+  loud flag when the dropped slot was mapped) and newly suggested. The
+  previous template.json is kept as template.prev.json as a safety net.
+  In the app: Template-First launcher → "Update from New Deck…".
+- **Map Slots reworked to the classic mapper's assignment feel**
+  (Windows field feedback): data sources sit in a sidebar — click one to
+  arm it, highlight the exact text it should replace in the shape, and
+  Assign. The slot targets just the selection, so "CLIENT NAME | MONTH
+  1st, 2026" can carry a client slot AND a date slot instead of one slot
+  replacing the whole box (no selection still means whole-box). Existing
+  slot targets are highlighted in the shape text; each slot row shows
+  its source, format, live value, and a remove button. Selection slots
+  re-anchor across template re-ingests like any other.
+- **Template-first AI tools**: CLI subcommands `ingest-template`,
+  `template-stores`, `build-template`, and MCP tools `ingest_template`,
+  `list_template_stores`, `build_from_template` (writes honor
+  `INGESTION_MCP_READ_ONLY=1`). All thin shells over
+  `engine/workflow.py`, like the rest of the AI layer.
+- 14 new tests across Phases C+D; the Phase A round-trip invariant and
+  all Phase B tests pass unchanged.
+
 ## July 16, 2026 - Template-first mapper Phase B: classification, slots, dynamic text builds
 
 - **Template-first Phase B shipped — text slots end to end.** An ingested

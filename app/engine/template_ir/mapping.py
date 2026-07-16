@@ -16,7 +16,7 @@ import logging
 import os
 
 from engine.pptx_formats import _coerce_number, _format_value, format_with_details
-from engine.query_resolver import resolve_query
+from engine.query_resolver import resolve_query, resolve_query_payload
 from engine.template_ir.schema import load_template_ir
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,15 @@ def load_slot_mapping(template_dir):
 
 
 def _query_value_kind(query):
-    """'text' | 'date' | 'number' — what a query resolves to."""
+    """'text' | 'date' | 'number' | 'chart_data' | 'table_data' — what a
+    query resolves to. Builder queries carry the output the user applied
+    them as (value/table/chart)."""
     if isinstance(query, dict):
+        output = query.get("output", "value")
+        if output == "table":
+            return "table_data"
+        if output == "chart":
+            return "chart_data"
         return "number"
     if query in _TEXT_KEYS:
         return "text"
@@ -85,6 +92,12 @@ def validate_slot_mapping(ir, mapping):
         if expected in ("number", "date") and actual != expected:
             warnings.append(f"'{name}' expects a {expected} but the mapped "
                             f"source produces {actual}")
+        elif expected == "chart_data" and actual != "chart_data":
+            warnings.append(f"'{name}' is a chart — map an Advanced Query "
+                            "Builder query applied as Chart Data")
+        elif expected == "table_data" and actual != "table_data":
+            warnings.append(f"'{name}' is a table — map an Advanced Query "
+                            "Builder query applied as Table")
     return warnings
 
 
@@ -103,7 +116,16 @@ def resolve_slot_values(ir, mapping, client_data, client_name="",
         if not query:
             issues.append((name, "no data source mapped"))
             continue
+        slot_type = registry.get(name, {}).get("type", "text")
         try:
+            if slot_type in ("chart_data", "table_data"):
+                kind = "chart" if slot_type == "chart_data" else "table"
+                payload = resolve_query_payload(query, client_data, kind)
+                if payload is None:
+                    issues.append((name, "query matched no data rows"))
+                else:
+                    values[name] = payload
+                continue
             value = resolve_query(query, client_data, client_name,
                                   start_date, end_date)
         except Exception as e:
