@@ -92,7 +92,9 @@ def test_ingest_writes_schema_and_assets(tmp_path, branded_deck):
     assert text_shape.geometry["left"] == 914400  # Inches(1)
 
 
-def test_chart_shapes_are_flagged_and_skipped(tmp_path):
+def test_chart_shapes_are_cloned_with_their_parts(tmp_path):
+    """Phase C: charts ingest with their part extracted and rebuild by
+    part cloning (until v1.32 they were flagged unsupported and skipped)."""
     from pptx.chart.data import CategoryChartData
     from pptx.enum.chart import XL_CHART_TYPE
 
@@ -111,17 +113,54 @@ def test_chart_shapes_are_flagged_and_skipped(tmp_path):
     template_dir = ingest_template(deck, store_dir=_store(tmp_path))
     ir = load_template_ir(template_dir)
     (chart,) = [s for s in ir.slides[0].shapes if s.shape_type == "chart"]
-    assert chart.unsupported  # Phase C, loudly
+    assert chart.unsupported is None
+    assert os.path.isfile(os.path.join(template_dir, chart.chart_part["xml"]))
+    assert os.path.isfile(os.path.join(template_dir,
+                                       chart.chart_part["workbook"]))
 
     out = str(tmp_path / "rebuilt.pptx")
     _, report = build_from_template(template_dir, out)
-    assert report["shapes_copied"] == 1          # the textbox
-    assert [s for s, _ in report["skipped"]] == [chart.shape_id]
+    assert report["shapes_copied"] == 2
+    assert report["charts_cloned"] == 1
+    assert report["skipped"] == []
 
     rebuilt = Presentation(out)
     texts = [s.text_frame.text for s in rebuilt.slides[0].shapes
              if s.has_text_frame]
     assert "KEEP ME" in texts
+    (new_chart,) = [s for s in rebuilt.slides[0].shapes if s.has_chart]
+    assert list(new_chart.chart.plots[0].categories) == ["A", "B"]
+    assert list(new_chart.chart.series[0].values) == [1.0, 2.0]
+
+
+def test_legacy_store_with_unsupported_chart_still_skips(tmp_path):
+    """A pre-Phase-C store (chart flagged unsupported, no extracted part)
+    keeps the old loud-skip behavior."""
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    data = CategoryChartData()
+    data.categories = ["A"]
+    data.add_series("S", (1,))
+    slide.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1),
+                           Inches(1), Inches(6), Inches(4), data)
+    deck = str(tmp_path / "chart_deck.pptx")
+    prs.save(deck)
+
+    template_dir = ingest_template(deck, store_dir=_store(tmp_path))
+    ir = load_template_ir(template_dir)
+    (chart,) = ir.slides[0].shapes
+    chart.unsupported = "chart (template-first Phase C)"
+    chart.chart_part = {}
+    from engine.template_ir import save_template_ir
+    save_template_ir(ir, template_dir)
+
+    _, report = build_from_template(template_dir,
+                                    str(tmp_path / "rebuilt.pptx"))
+    assert report["shapes_copied"] == 0
+    assert [s for s, _ in report["skipped"]] == [chart.shape_id]
 
 
 # ── Build: verbatim fidelity ──────────────────────────────────────────────────

@@ -144,16 +144,24 @@ class SlotMapperWindow:
                  font=("Segoe UI", 8), bg=t["card"], fg=t["muted"],
                  anchor="w").pack(fill="x")
 
+        is_frame_slot = spec["type"] in ("chart_data", "table_data")
         source_var = tk.StringVar()
         combo = ttk.Combobox(row, textvariable=source_var, width=34,
-                             state="readonly",
-                             values=list(self._option_by_label))
+                             state="disabled" if is_frame_slot
+                             else "readonly",
+                             values=[] if is_frame_slot
+                             else list(self._option_by_label))
+        if is_frame_slot:
+            apply_as = ("Chart Data" if spec["type"] == "chart_data"
+                        else "Table")
+            source_var.set(f"(use Advanced… → Apply as {apply_as})")
         combo.pack(side="left", padx=6)
 
         format_var = tk.StringVar(value=spec["type"]
                                   if spec["type"] in FORMATS else "text")
         fmt = ttk.Combobox(row, textvariable=format_var, width=10,
-                           state="readonly", values=FORMATS)
+                           state="disabled" if is_frame_slot
+                           else "readonly", values=FORMATS)
         fmt.pack(side="left", padx=6)
 
         tk.Button(row, text="Advanced…", font=("Segoe UI", 8),
@@ -221,7 +229,16 @@ class SlotMapperWindow:
             self.ir, mapping, client_data, self.client_name,
             self.start_date, self.end_date)
         if slot in values:
-            state["preview"].config(text=f"→ {values[slot]}")
+            value = values[slot]
+            if isinstance(value, dict) and "rows" in value:
+                shown = (f"{len(value['rows'])} row(s) × "
+                         f"{len(value.get('headers', []))} column(s)")
+            elif isinstance(value, dict) and "categories" in value:
+                shown = (f"{len(value['categories'])} categories, "
+                         f"{len(value.get('series', []))} series")
+            else:
+                shown = value
+            state["preview"].config(text=f"→ {shown}")
         else:
             state["preview"].config(text=f"⚠ {dict(issues).get(slot, '')}")
 

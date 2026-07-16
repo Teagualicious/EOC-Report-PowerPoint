@@ -349,6 +349,153 @@ def test_excluded_shape_is_skipped_and_its_slot_reported(classified_dir,
                for s in deck.slides[0].shapes if s.shape_type != 6)
 
 
+# ── Phase C: chart and table slots ────────────────────────────────────────────
+
+@pytest.fixture
+def chart_table_dir(tmp_path):
+    """Ingested + classified store for a deck with a styled chart and a
+    branded table."""
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    data = CategoryChartData()
+    data.categories = ["OLD-A", "OLD-B", "OLD-C"]
+    data.add_series("Impressions", (10, 20, 30))
+    gf = slide.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1),
+                                Inches(1), Inches(6), Inches(3.5), data)
+    gf.name = "Zip Chart"
+    series = gf.chart.series[0]
+    series.format.fill.solid()
+    series.format.fill.fore_color.rgb = RGBColor(0x00, 0x54, 0xA6)
+
+    table_frame = slide.shapes.add_table(2, 2, Inches(8), Inches(1),
+                                         Inches(4), Inches(2))
+    table_frame.name = "Delivery Table"
+    table = table_frame.table
+    table.cell(0, 0).text = "ZIP"
+    table.cell(0, 1).text = "IMPRESSIONS"
+    table.cell(0, 0).text_frame.paragraphs[0].runs[0].font.bold = True
+
+    deck = str(tmp_path / "Chart Table Template.pptx")
+    prs.save(deck)
+    template_dir = ingest_template(deck, store_dir=str(tmp_path / "ct_store"))
+    ir = classify_template(load_template_ir(template_dir))
+    save_template_ir(ir, template_dir)
+    return template_dir
+
+
+def _zip_query(output):
+    """A saved Advanced Query Builder query over the conftest client_data's
+    zip breakdown, applied as the given output kind."""
+    return {"metric": "Impressions", "breakdown": "all", "filter": "all",
+            "agg": "sum", "top_n": "all", "campaigns": [],
+            "sources": ["zip"], "values": [], "output": output}
+
+
+def test_classify_creates_chart_and_table_slots(chart_table_dir):
+    ir = load_template_ir(chart_table_dir)
+    slots = ir.slot_registry
+    assert slots["zip_chart"]["type"] == "chart_data"
+    assert slots["delivery_table"]["type"] == "table_data"
+    for shape in ir.slides[0].shapes:
+        assert shape.classification == "dynamic"
+        assert shape.unsupported is None
+    (chart,) = [s for s in ir.slides[0].shapes if s.shape_type == "chart"]
+    assert chart.chart_part["xml"] and chart.chart_part["workbook"]
+
+
+def test_builder_query_resolves_to_payloads(client_data):
+    from engine.query_resolver import resolve_query_payload
+    table = resolve_query_payload(_zip_query("table"), client_data, "table")
+    assert table["headers"] == ["level_value", "Campaign A", "Total"]
+    assert table["rows"] == [["33607", "35,000", "35,000"],
+                             ["33609", "25,000", "25,000"]]
+
+    chart = resolve_query_payload(_zip_query("chart"), client_data, "chart")
+    assert chart["categories"] == ["33607", "33609"]
+    assert chart["series"] == [{"name": "Campaign A",
+                                "values": [35000.0, 25000.0]}]  # no Total
+
+
+def test_validation_requires_matching_output_kind(chart_table_dir):
+    ir = load_template_ir(chart_table_dir)
+    mapping = new_slot_mapping(ir.template_id)
+    mapping["slots"] = {"zip_chart": {"query": "__client_name__"},
+                        "delivery_table": {"query": _zip_query("value")}}
+    warnings = validate_slot_mapping(ir, mapping)
+    assert any("zip_chart" in w and "Chart Data" in w for w in warnings)
+    assert any("delivery_table" in w and "Table" in w for w in warnings)
+
+
+def test_build_injects_chart_data_preserving_series_color(chart_table_dir,
+                                                          client_data,
+                                                          tmp_path):
+    from lxml import etree
+    mapping = new_slot_mapping("ct")
+    mapping["slots"] = {"zip_chart": {"query": _zip_query("chart")}}
+    save_slot_mapping(mapping, chart_table_dir)
+
+    out = str(tmp_path / "built.pptx")
+    _, report = build_mapped_report(chart_table_dir, out, client_data,
+                                    client_name="Acme Appliance Co")
+    assert report["charts_cloned"] == 1
+    filled = dict.fromkeys([s for s, _ in report["slots_unfilled"]])
+    assert "zip_chart" not in filled
+
+    deck = Presentation(out)
+    (chart_shape,) = [s for s in deck.slides[0].shapes if s.has_chart]
+    chart = chart_shape.chart
+    assert list(chart.plots[0].categories) == ["33607", "33609"]
+    assert list(chart.series[0].values) == [35000.0, 25000.0]
+    # Series-level styling survives injection (replace_data leaves it alone)
+    ser_xml = etree.tostring(chart.series[0]._element).decode()
+    assert "0054A6" in ser_xml
+    # The embedded workbook was replaced too — "Edit Data" stays truthful
+    assert chart.part.chart_workbook.xlsx_part is not None
+
+
+def test_build_fills_table_keeping_branded_header(chart_table_dir,
+                                                  client_data, tmp_path):
+    mapping = new_slot_mapping("ct")
+    mapping["slots"] = {"delivery_table": {"query": _zip_query("table")}}
+    save_slot_mapping(mapping, chart_table_dir)
+
+    out = str(tmp_path / "built.pptx")
+    _, report = build_mapped_report(chart_table_dir, out, client_data,
+                                    client_name="Acme Appliance Co")
+    assert ("delivery_table",
+            "table has 2 column(s); 1 data column(s) dropped"
+            ) not in report["slots_unfilled"]
+    assert any("delivery_table" in n and "dropped" in n
+               for n in report["notes"])   # Total column didn't fit — loud
+
+    deck = Presentation(out)
+    (table_shape,) = [s for s in deck.slides[0].shapes if s.has_table]
+    table = table_shape.table
+    assert len(table.rows) == 3            # header + 2 data (one row cloned)
+    assert table.cell(0, 0).text == "ZIP"  # branded header kept
+    assert table.cell(0, 0).text_frame.paragraphs[0].runs[0].font.bold
+    assert table.cell(1, 0).text == "33607"
+    assert table.cell(1, 1).text == "35,000"
+    assert table.cell(2, 0).text == "33609"
+
+
+def test_chart_round_trip_without_data_keeps_original_values(chart_table_dir,
+                                                             tmp_path):
+    """A plain rebuild (no slot values) must still produce a working chart
+    showing the template's original cached data."""
+    out = str(tmp_path / "plain.pptx")
+    _, report = build_from_template(chart_table_dir, out)
+    assert report["charts_cloned"] == 1 and report["skipped"] == []
+    deck = Presentation(out)
+    (chart_shape,) = [s for s in deck.slides[0].shapes if s.has_chart]
+    assert list(chart_shape.chart.plots[0].categories) == \
+        ["OLD-A", "OLD-B", "OLD-C"]
+
+
 def test_multiline_value_becomes_real_line_breaks(classified_dir, tmp_path):
     out = str(tmp_path / "out.pptx")
     build_from_template(classified_dir, out,

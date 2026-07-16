@@ -240,6 +240,27 @@ and tables classify dynamic but take no slots until Phase C; re-ingest
 reconciliation (classify_template overwrites review work if re-run) is
 Phase D as planned. Tests: `tests/test_template_slots.py`.
 
+## Phase C — DONE 2026-07-16 (charts and tables, same release as B)
+
+Exactly the Critique 2 strategy: ingest extracts the whole chart part
+(chart XML + embedded workbook + chartColors/chartStyle parts) into the
+template's assets; the builder clones the part into the new package with
+relationships rewired and points the copied graphicFrame at it. Data
+injection uses python-pptx's `chart.replace_data`, whose series rewriter
+replaces only each series' cached `c:tx`/`c:cat`/`c:val` and the
+embedded workbook — "all series-level formatting is left undisturbed"
+(verified by a test asserting a brand series color survives injection).
+The original cached number format is carried into the new caches so
+source-linked data labels don't drift to General. XY/bubble charts are
+detected and reported as uninjectable (category charts only). Table
+slots fill below the template's branded header row, cloning the last row
+on overflow and clearing leftovers; truncation is reported. Payloads
+resolve through the same `build_pivot` the builder displayed
+(`pivot_to_table`/`pivot_to_chart`). **Library checkpoint resolved:**
+python-pptx sufficed — the Aspose.Slides question stays closed unless
+real templates surface chart content it cannot handle (SmartArt remains
+out of scope, detected as "graphicFrame content").
+
 ## Cross-references
 
 - Proposal: `../proposals/TEMPLATE_FIRST_MAPPER_2026-07-15.md`

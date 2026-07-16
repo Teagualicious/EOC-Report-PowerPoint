@@ -120,9 +120,9 @@ def _suggest_slot_name(run, all_runs, reason):
 def _classify_shape(shape):
     """(classification, reason, dynamic_runs, all_runs) for one ShapeIR."""
     if shape.shape_type == "chart":
-        return "dynamic", "charts always receive mapped data (Phase C)", [], []
+        return "dynamic", "charts always receive mapped data", [], []
     if shape.shape_type == "table":
-        return "dynamic", "tables always receive mapped data (Phase C)", [], []
+        return "dynamic", "tables always receive mapped data", [], []
     if shape.shape_type == "image":
         return "static", "logo or brand image", [], []
 
@@ -157,6 +157,9 @@ def classify_template(ir):
             shape.classification = classification
             shape.classify_reason = reason
             shape.slot_name = None
+            if shape.shape_type in ("chart", "table"):
+                _add_frame_slot(ir, slide, shape, used)
+                continue
             for run, run_reason, slot_type in dynamic_runs:
                 name = _unique_name(
                     _suggest_slot_name(run, all_runs, run_reason), used)
@@ -173,6 +176,28 @@ def classify_template(ir):
                 if shape.slot_name is None:
                     shape.slot_name = name
     return ir
+
+
+def _add_frame_slot(ir, slide, shape, used):
+    """One whole-shape slot for a chart or table (Phase C). Charts whose
+    part could not be extracted get none — they cannot be built."""
+    if shape.unsupported:
+        return
+    slot_type = "chart_data" if shape.shape_type == "chart" else "table_data"
+    name = _unique_name(sanitize_slot_name(shape.name), used)
+    ir.slot_registry[name] = {
+        "type": slot_type,
+        "description": f"{shape.shape_type} \"{shape.name}\" — map an "
+                       "Advanced Query Builder query (Apply as "
+                       f"{'Chart Data' if slot_type == 'chart_data' else 'Table'})",
+        "slide_index": slide.slide_index,
+        "shape_id": shape.shape_id,
+        "shape_uid": shape.shape_uid,
+        "placeholder_text": "",
+        "paragraph": None,
+        "run": None,
+    }
+    shape.slot_name = name
 
 
 # ── Review-GUI mutations (pure, headlessly tested) ───────────────────────────
@@ -204,7 +229,10 @@ def set_classification(ir, shape_id, classification):
             del ir.slot_registry[name]
         shape.slot_name = None
         return
-    if shape_slots(ir, shape_id) or shape.shape_type in ("chart", "table"):
+    if shape_slots(ir, shape_id):
+        return
+    if shape.shape_type in ("chart", "table"):
+        _add_frame_slot(ir, slide, shape, set(ir.slot_registry))
         return
     runs = extract_runs(shape.element_xml)
     used = set(ir.slot_registry)
