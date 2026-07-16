@@ -1,6 +1,30 @@
 # Changelog
 
-## July 16, 2026 - Template-first mapper Phases B+C: classification, slots, dynamic text, charts and tables
+## July 16, 2026 - Template-first mapper Phase C: charts and tables
+
+- **Charts are no longer skipped by template-first builds.** Ingest
+  extracts each chart's full part (chart XML, embedded workbook,
+  chartColors/chartStyle parts); the builder clones the part wholesale
+  with relationships rewired — a rebuilt deck's charts keep their exact
+  styling and "Edit Data" still works.
+- **Chart slots** (`chart_data`): map an Advanced Query Builder query
+  applied as Chart Data; the build injects categories/series through
+  python-pptx's cache rewriter, which touches only each series' cached
+  values — series colors, data labels, axes, legend all keep the
+  template's formatting. The embedded workbook is updated to match.
+  XY/bubble charts are detected and reported (category charts only).
+- **Table slots** (`table_data`): map a builder query applied as Table;
+  data rows fill beneath the template's own branded header row, the last
+  row is cloned when the data outgrows the table (formatting preserved),
+  leftover rows are cleared, and dropped columns are reported — nothing
+  silent.
+- Both resolve through the same `build_pivot` the builder displayed (new
+  pure `pivot_to_table`/`pivot_to_chart` transforms mirror the Apply as
+  Table/Chart Data outputs exactly).
+- 7 new tests; the Phase A round-trip invariant and all Phase B tests
+  pass unchanged.
+
+## July 16, 2026 - Template-first mapper Phase B: classification, slots, dynamic text builds
 
 - **Template-first Phase B shipped — text slots end to end.** An ingested
   template can now be classified, reviewed, mapped, and built into a
@@ -33,30 +57,10 @@
     path; template-first is opt-in until it survives a month-end cycle.
 - Owner decision recorded: slot data sources reuse the **full existing
   query schema** including builder/pivot queries (the review doc's open
-  question 4).
-- **Phase C shipped in the same release — charts and tables:**
-  - **Charts are no longer skipped.** Ingest extracts each chart's full
-    part (chart XML, embedded workbook, chartColors/chartStyle parts);
-    the builder clones the part wholesale with relationships rewired —
-    a rebuilt deck's charts are byte-identical, styling included, and
-    "Edit Data" still works.
-  - **Chart slots** (`chart_data`): map an Advanced Query Builder query
-    applied as Chart Data; the build injects categories/series through
-    python-pptx's cache rewriter, which touches only each series' cached
-    values — series colors, data labels, axes, legend all keep the
-    template's formatting. The embedded workbook is updated to match.
-    XY/bubble charts are detected and reported (category charts only).
-  - **Table slots** (`table_data`): map a builder query applied as
-    Table; data rows fill beneath the template's own branded header row,
-    the last row is cloned when the data outgrows the table (formatting
-    preserved), leftover rows are cleared, and dropped columns are
-    reported — nothing silent.
-  - Both resolve through the same `build_pivot` the builder displayed
-    (new pure `pivot_to_table`/`pivot_to_chart` transforms mirror the
-    Apply as Table/Chart Data outputs exactly).
-- 37 new tests (heuristics, registry mutations, mapping round-trip and
-  validation, resolver formatting, text/chart/table build and report
-  paths); the Phase A round-trip invariant is unchanged.
+  question 4); pivot-driven tables/charts remain Phase C.
+- 30 new tests (heuristics, registry mutations, mapping round-trip and
+  validation, resolver formatting, build fill/report paths); the Phase A
+  round-trip invariant is unchanged.
 
 ## July 15, 2026 - Saved-query fidelity, mapper polish, template-first Phase A
 
