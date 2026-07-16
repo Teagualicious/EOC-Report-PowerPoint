@@ -1,5 +1,29 @@
 # Changelog
 
+## July 16, 2026 - Map Slots field-feedback: custom text, images, date styles, slide preview, sizing fixes
+
+- **Quick Fill parity + polish** (feedback round 2): ✏ Custom Text and
+  🖼 Browse Image are sources again. Custom text persists in the
+  template's mapping (not per session) and multi-line text lands as REAL
+  line breaks in the export — the classic engine's flattened-text bug is
+  regression-tested dead here. Images copy into the template store and
+  fill by swapping the picture part, so crop/rounded corners/effects
+  survive; plain shapes (a "CLIENT LOGO" box) become a picture at their
+  exact geometry. Date slots pick their style (May 1st 2026 / 05/01/2026
+  / custom strftime…) right in the slot row. Map Slots also gains a
+  size-locked per-slide thumbnail (rendered from the source deck kept in
+  the store — PowerPoint on Windows, text summary elsewhere).
+- **Button bars no longer mash or clip** (feedback round 3): new
+  `ui.utils.grow_to_content` measures the real content size after a
+  window is built (fonts and Windows DPI included) and grows the window
+  to fit, clamped to the work area — applied to Settings, the
+  Template-First launcher, Template Review, Map Slots, and the template
+  selector. Any button added to a row in the future widens the window
+  instead of squeezing the row. The launcher's five actions also split
+  into two logical rows (template actions, then open actions).
+- (These two rounds were meant for v1.34.0 but PR #19 squash-merged a
+  stale head — fourth occurrence — so they ship here.)
+
 ## July 16, 2026 - Template-first mapper Phases C+D: charts, tables, template evolution, AI tools
 
 - **Charts are no longer skipped by template-first builds.** Ingest
@@ -39,25 +63,6 @@
   slot targets are highlighted in the shape text; each slot row shows
   its source, format, live value, and a remove button. Selection slots
   re-anchor across template re-ingests like any other.
-- **Quick Fill parity + polish** (feedback round 2): ✏ Custom Text and
-  🖼 Browse Image are sources again. Custom text persists in the
-  template's mapping (not per session) and multi-line text lands as REAL
-  line breaks in the export — the classic engine's flattened-text bug is
-  regression-tested dead here. Images copy into the template store and
-  fill by swapping the picture part, so crop/rounded corners/effects
-  survive; plain shapes (a "CLIENT LOGO" box) become a picture at their
-  exact geometry. Date slots pick their style (May 1st 2026 / 05/01/2026
-  / custom strftime…) right in the slot row. Map Slots also gains a
-  size-locked per-slide thumbnail (rendered from the source deck kept in
-  the store — PowerPoint on Windows, text summary elsewhere).
-- **Button bars no longer mash or clip** (feedback round 3): new
-  `ui.utils.grow_to_content` measures the real content size after a
-  window is built (fonts and Windows DPI included) and grows the window
-  to fit, clamped to the work area — applied to Settings, the
-  Template-First launcher, Template Review, Map Slots, and the template
-  selector. Any button added to a row in the future widens the window
-  instead of squeezing the row. The launcher's five actions also split
-  into two logical rows (template actions, then open actions).
 - **Template-first AI tools**: CLI subcommands `ingest-template`,
   `template-stores`, `build-template`, and MCP tools `ingest_template`,
   `list_template_stores`, `build_from_template` (writes honor
