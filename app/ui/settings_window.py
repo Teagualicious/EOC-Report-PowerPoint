@@ -3,7 +3,7 @@
 import logging
 import os
 import tkinter as tk
-from ui.utils import fit_window, run_in_background
+from ui.utils import fit_window, grow_to_content, run_in_background
 from tkinter import ttk, filedialog, messagebox
 
 from config.naming import safe_component
@@ -94,6 +94,9 @@ class SettingsWindow:
         tk.Button(self.window, text="Save & Close", font=("Segoe UI", 11, "bold"),
                   bg=t["accent"], fg="white", relief="flat", padx=20, pady=8,
                   command=self._save_and_close).grid(row=1, column=0, pady=12)
+        # The Templates tab's action row outgrew the design width on real
+        # Windows DPI — size to the content so buttons never mash or clip
+        grow_to_content(self.window)
 
     # -- Templates tab --
 

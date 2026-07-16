@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import queue
 import sys
 import threading
 import tkinter as tk
 from tkinter import ttk
+
+logger = logging.getLogger(__name__)
 
 _BASE_TK_SCALING = 96 / 72  # Tk's scaling value at 100% Windows DPI.
 
@@ -121,6 +124,62 @@ def fit_window(win, want_w, want_h, center=True):
             win.geometry(f"{w}x{h}")
     except (tk.TclError, ValueError, AttributeError):
         win.geometry(f"{want_w}x{want_h}")
+
+
+def _grown_geometry(req_w, req_h, cur_w, cur_h, avail_w, avail_h, margin):
+    """Pure sizing math behind ``grow_to_content``: grow to the content's
+    required size, never shrink below the current size, clamp to the
+    work area. Returns (w, h)."""
+    w = min(max(cur_w, req_w), max(320, avail_w - margin * 2))
+    h = min(max(cur_h, req_h), max(240, avail_h - margin * 2))
+    return w, h
+
+
+def _current_size(win):
+    """The window's present (or pending) size — winfo when mapped, else
+    the geometry request set earlier by fit_window."""
+    w, h = win.winfo_width(), win.winfo_height()
+    if w > 1 and h > 1:
+        return w, h
+    try:
+        size = win.geometry().split("+")[0]
+        gw, gh = size.split("x")
+        return int(gw), int(gh)
+    except (tk.TclError, ValueError):
+        return w, h
+
+
+def grow_to_content(win, pad_w=24, pad_h=16, center=True):
+    """Call AFTER a window's widgets are built: when Tk's required size
+    for the content exceeds the window's design size — long button rows,
+    bigger fonts, Windows DPI scaling — grow the window (clamped to the
+    work area) so action buttons never mash together or clip off the
+    edge. The design size from ``fit_window`` stays the minimum look;
+    this only ever ADDS room. Also pins minsize so a manual resize can't
+    re-mash the bar.
+    """
+    try:
+        win.update_idletasks()
+        req_w = win.winfo_reqwidth() + pad_w
+        req_h = win.winfo_reqheight() + pad_h
+        cur_w, cur_h = _current_size(win)
+        scale = _dpi_scale_factor(win)
+        left, top, avail_w, avail_h = _work_area(win)
+        margin = max(12, round(18 * scale))
+        w, h = _grown_geometry(req_w, req_h, cur_w, cur_h,
+                               avail_w, avail_h, margin)
+        win.minsize(min(w, req_w), min(h, req_h))
+        if (w, h) == (cur_w, cur_h):
+            return
+        if center:
+            x = left + max(margin, (avail_w - w) // 2)
+            y = top + max(margin, min((avail_h - h) // 3,
+                                      avail_h - h - margin))
+            win.geometry(f"{w}x{h}+{x}+{y}")
+        else:
+            win.geometry(f"{w}x{h}")
+    except (tk.TclError, ValueError, AttributeError):
+        logger.debug("grow_to_content failed", exc_info=True)
 
 
 def configure_ttk_styles(root, theme):

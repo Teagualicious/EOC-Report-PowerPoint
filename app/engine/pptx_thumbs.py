@@ -23,17 +23,18 @@ THUMBS_DIR = os.path.join(TEMPLATES_DIR, "thumbs")
 _EXPORT_LOCK = threading.Lock()
 
 
-def _thumb_path(template_path):
+def _thumb_path(template_path, slide_num=1):
     base = os.path.splitext(os.path.basename(template_path))[0]
-    return os.path.join(THUMBS_DIR, f"{base}.png")
+    suffix = "" if slide_num == 1 else f"_s{slide_num}"
+    return os.path.join(THUMBS_DIR, f"{base}{suffix}.png")
 
 
-def get_template_thumbnail(template_path, width=480):
-    """Return a cached/generated slide-1 PNG path, or ``None``."""
+def get_template_thumbnail(template_path, width=480, slide_num=1):
+    """Return a cached/generated PNG path for one slide, or ``None``."""
     if not os.path.exists(template_path):
         return None
 
-    png = _thumb_path(template_path)
+    png = _thumb_path(template_path, slide_num)
     try:
         if (os.path.exists(png)
                 and os.path.getmtime(png) >= os.path.getmtime(template_path)):
@@ -41,7 +42,19 @@ def get_template_thumbnail(template_path, width=480):
     except OSError:
         logger.debug("Thumb mtime check failed for %s", png, exc_info=True)
 
-    return _export_thumbnail(template_path, png, width)
+    return _export_thumbnail(template_path, png, width, slide_num)
+
+
+def get_slide_preview(template_path, slide_num, width=480):
+    """Per-slide preview for the template-first slot mapper — same shape
+    of result as ``get_template_preview`` (image path or text fallback)."""
+    png = get_template_thumbnail(template_path, width=width,
+                                 slide_num=slide_num)
+    if png:
+        return {"kind": "image", "value": png}
+    return {"kind": "text",
+            "value": _slide_text_summary(template_path,
+                                         slide_index=slide_num - 1)}
 
 
 def get_template_preview(template_path, width=480):
@@ -58,16 +71,17 @@ def get_template_preview(template_path, width=480):
     return {"kind": "text", "value": _slide_text_summary(template_path)}
 
 
-def _slide_text_summary(template_path, max_items=6, max_chars=42):
-    """Return a concise slide-1 text fallback for preview panels."""
+def _slide_text_summary(template_path, max_items=6, max_chars=42,
+                        slide_index=0):
+    """Return a concise per-slide text fallback for preview panels."""
     filename = os.path.basename(template_path)
     try:
         from pptx import Presentation
 
         prs = Presentation(template_path)
         texts = []
-        if prs.slides:
-            for shape in prs.slides[0].shapes:
+        if len(prs.slides) > slide_index:
+            for shape in prs.slides[slide_index].shapes:
                 if getattr(shape, "has_text_frame", False):
                     text = shape.text_frame.text.strip()
                     if text:
@@ -78,8 +92,8 @@ def _slide_text_summary(template_path, max_items=6, max_chars=42):
         return filename
 
 
-def _export_thumbnail(template_path, png_path, width):
-    """Export slide 1 as PNG via an isolated PowerPoint COM instance."""
+def _export_thumbnail(template_path, png_path, width, slide_num=1):
+    """Export one slide as PNG via an isolated PowerPoint COM instance."""
     try:
         import pythoncom
         import win32com.client
@@ -100,9 +114,9 @@ def _export_thumbnail(template_path, png_path, width):
         app = win32com.client.DispatchEx("PowerPoint.Application")
         prs = app.Presentations.Open(
             os.path.abspath(template_path), ReadOnly=True, WithWindow=False)
-        if prs.Slides.Count < 1:
+        if prs.Slides.Count < slide_num:
             return None
-        prs.Slides(1).Export(os.path.abspath(png_path), "PNG", width)
+        prs.Slides(slide_num).Export(os.path.abspath(png_path), "PNG", width)
         return png_path if os.path.exists(png_path) else None
     except Exception:
         logger.debug("Thumbnail export failed for %s", template_path,

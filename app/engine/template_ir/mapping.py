@@ -52,10 +52,15 @@ def load_slot_mapping(template_dir):
 
 
 def _query_value_kind(query):
-    """'text' | 'date' | 'number' | 'chart_data' | 'table_data' — what a
-    query resolves to. Builder queries carry the output the user applied
-    them as (value/table/chart)."""
+    """'text' | 'date' | 'number' | 'image' | 'chart_data' | 'table_data'
+    — what a query resolves to. Builder queries carry the output the user
+    applied them as (value/table/chart); custom text and images are
+    literals stored in the mapping itself."""
     if isinstance(query, dict):
+        if "custom_text" in query:
+            return "text"
+        if "image_path" in query or "image_path_abs" in query:
+            return "image"
         output = query.get("output", "value")
         if output == "table":
             return "table_data"
@@ -98,6 +103,12 @@ def validate_slot_mapping(ir, mapping):
         elif expected == "table_data" and actual != "table_data":
             warnings.append(f"'{name}' is a table — map an Advanced Query "
                             "Builder query applied as Table")
+        elif expected == "image" and actual != "image":
+            warnings.append(f"'{name}' is an image slot — map a Browse "
+                            "Image source")
+        elif actual == "image" and expected != "image":
+            warnings.append(f"'{name}' is a {expected} slot but the mapped "
+                            "source is an image")
     return warnings
 
 
@@ -117,6 +128,22 @@ def resolve_slot_values(ir, mapping, client_data, client_name="",
             issues.append((name, "no data source mapped"))
             continue
         slot_type = registry.get(name, {}).get("type", "text")
+        context = registry.get(name, {}).get("placeholder_text", "")
+        # Literals stored in the mapping itself (Quick Fill parity):
+        # custom text goes through the same display pipeline as data
+        # values; images pass their paths through for the builder.
+        if isinstance(query, dict) and "custom_text" in query:
+            values[name] = _display_value(query["custom_text"],
+                                          entry.get("format", "text"),
+                                          entry.get("format_details"),
+                                          context)
+            continue
+        if isinstance(query, dict) and ("image_path" in query
+                                        or "image_path_abs" in query):
+            values[name] = {"image_path": query.get("image_path", ""),
+                            "image_path_abs": query.get("image_path_abs",
+                                                        "")}
+            continue
         try:
             if slot_type in ("chart_data", "table_data"):
                 kind = "chart" if slot_type == "chart_data" else "table"
@@ -132,7 +159,6 @@ def resolve_slot_values(ir, mapping, client_data, client_name="",
             logger.exception("Slot query failed: %s", name)
             issues.append((name, f"query failed: {e}"))
             continue
-        context = registry.get(name, {}).get("placeholder_text", "")
         values[name] = _display_value(value, entry.get("format", "text"),
                                       entry.get("format_details"), context)
     return values, issues

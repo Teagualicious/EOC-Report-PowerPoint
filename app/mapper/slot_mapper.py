@@ -27,7 +27,7 @@ from engine.template_ir import (load_slot_mapping, load_template_ir,
 from engine.template_ir.classify import add_slot, remove_slot
 from engine.template_ir.mapping import build_mapped_report, resolve_slot_values
 from mapper.query_builder import show_query_builder
-from ui.utils import fit_window
+from ui.utils import fit_window, grow_to_content
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,10 @@ _SECTION_TITLES = {"special": "Quick Fill", "total": "Totals",
 def _source_kind(query):
     """(slot_type, default_format) a source produces."""
     if isinstance(query, dict):
+        if "custom_text" in query:
+            return "text", "text"
+        if "image_path" in query or "image_path_abs" in query:
+            return "image", "text"
         return "number", "number"
     if isinstance(query, str) and query.startswith("__total_"):
         return "number", "number"
@@ -139,6 +143,7 @@ class SlotMapperWindow:
                       fg="white", relief="flat", padx=15, pady=6,
                       command=self._build_report).pack(side="right")
 
+        grow_to_content(self.window)
         self._render_slide()
 
     def _build_sidebar(self, main):
@@ -180,7 +185,7 @@ class SlotMapperWindow:
         t = self.t
         pane = tk.Frame(main, bg=t["bg"])
         pane.grid(row=0, column=1, sticky="nsew")
-        pane.rowconfigure(1, weight=1)
+        pane.rowconfigure(2, weight=1)
         pane.columnconfigure(0, weight=1)
 
         nav = tk.Frame(pane, bg=t["bg"])
@@ -201,8 +206,30 @@ class SlotMapperWindow:
                                     bg=t["bg"], fg=t["muted"])
         self.armed_label.pack(side="right")
 
+        # Per-slide thumbnail (from the source deck kept in the store) —
+        # size-locked like every preview pane in this app. Renders via
+        # PowerPoint on Windows; elsewhere it shows a text summary.
+        from engine.template_ir.ingest import SOURCE_PPTX_NAME
+        self._source_pptx = os.path.join(self.template_dir,
+                                         SOURCE_PPTX_NAME)
+        self._thumb_ref = None
+        self._thumb_token = 0
+        self.preview_label = None
+        if os.path.isfile(self._source_pptx):
+            preview_frame = tk.LabelFrame(
+                pane, text="  Slide Preview  ",
+                font=("Segoe UI", 9, "bold"), bg=t["card"],
+                fg=t["card_fg"], width=360, height=210)
+            preview_frame.grid(row=1, column=0, sticky="w", pady=(0, 4))
+            preview_frame.pack_propagate(False)
+            self.preview_label = tk.Label(preview_frame, bg="#333333",
+                                          text="Loading preview…",
+                                          fg="#888888",
+                                          font=("Segoe UI", 9))
+            self.preview_label.pack(fill="both", expand=True)
+
         holder = tk.Frame(pane, bg=t["card"])
-        holder.grid(row=1, column=0, sticky="nsew")
+        holder.grid(row=2, column=0, sticky="nsew")
         self.canvas = tk.Canvas(holder, bg=t["card"], highlightthickness=0)
         sb = ttk.Scrollbar(holder, orient="vertical",
                            command=self.canvas.yview)
@@ -220,7 +247,13 @@ class SlotMapperWindow:
     # ── Sources ───────────────────────────────────────────────────────────
 
     def _source_catalog(self):
-        catalog = list(self.options)
+        # Quick Fill parity with the classic mapper: custom text and
+        # images are first-class sources (both arm through a picker)
+        catalog = [{"key": "__custom__", "label": "✏ Custom Text…",
+                    "category": "special"},
+                   {"key": "__browse_image__", "label": "🖼 Browse Image…",
+                    "category": "special"}]
+        catalog += list(self.options)
         for name, entry in self.named_queries.items():
             catalog.append({"key": None, "label": f"⚡ {name}",
                             "category": "queries",
@@ -259,12 +292,65 @@ class SlotMapperWindow:
             self._source_buttons[label] = btn
 
     def _arm(self, option):
+        if option.get("key") == "__custom__":
+            text = self._ask_custom_text()
+            if not text:
+                return
+            snippet = text.splitlines()[0][:24]
+            option = {"label": f"✏ “{snippet}”",
+                      "query": {"custom_text": text}}
+        elif option.get("key") == "__browse_image__":
+            path = filedialog.askopenfilename(
+                parent=self.window, title="Choose the image to insert",
+                filetypes=[("Images", "*.png *.jpg *.jpeg *.gif *.bmp"),
+                           ("All files", "*.*")])
+            if not path:
+                return
+            option = {"label": f"🖼 {os.path.basename(path)}",
+                      "query": {"image_path_abs": path}}
         query = option.get("query") or option.get("key")
         self.armed = {"label": option["label"], "query": query}
+        hint = ("click Assign on the shape to replace its image"
+                if _source_kind(query)[0] == "image"
+                else "highlight text and Assign")
         self.armed_label.config(
-            text=f"Armed: {option['label']} — highlight text and Assign",
-            fg=ARMED_COLOR)
+            text=f"Armed: {option['label']} — {hint}", fg=ARMED_COLOR)
         self._render_sources()
+
+    def _ask_custom_text(self):
+        """Multi-line custom text prompt (the classic mapper's ✏ field,
+        grown up: line breaks land as REAL breaks in the deck)."""
+        t = self.t
+        dialog = tk.Toplevel(self.window)
+        dialog.title("Custom Text")
+        fit_window(dialog, 420, 240)
+        dialog.configure(bg=t["bg"]); dialog.transient(self.window)
+        dialog.grab_set(); dialog.lift(); dialog.focus_force()
+        tk.Label(dialog, text="Text to insert (line breaks are kept):",
+                 font=("Segoe UI", 9), bg=t["bg"], fg=t["fg"]
+                 ).pack(padx=12, pady=(10, 4), anchor="w")
+        box = tk.Text(dialog, height=6, font=("Segoe UI", 10),
+                      bg=t["input_bg"], fg=t["input_fg"],
+                      insertbackground=t["insert"], relief="solid",
+                      borderwidth=1)
+        box.pack(fill="both", expand=True, padx=12)
+        box.focus_set()
+        result = {"text": ""}
+
+        def ok():
+            result["text"] = box.get("1.0", "end-1c").strip()
+            dialog.destroy()
+
+        row = tk.Frame(dialog, bg=t["bg"])
+        row.pack(fill="x", padx=12, pady=8)
+        tk.Button(row, text="Use This Text", font=("Segoe UI", 9, "bold"),
+                  bg=ARMED_COLOR, fg="white", relief="flat", padx=12,
+                  pady=4, command=ok).pack(side="left")
+        tk.Button(row, text="Cancel", font=("Segoe UI", 9),
+                  bg=t["secondary"], fg=t["secondary_fg"], relief="flat",
+                  padx=12, pady=4, command=dialog.destroy).pack(side="right")
+        self.window.wait_window(dialog)
+        return result["text"]
 
     def _open_advanced_source(self):
         if not self.export_result.get("client_data"):
@@ -313,6 +399,9 @@ class SlotMapperWindow:
             if shape.shape_type in ("chart", "table"):
                 self._render_frame_card(shape)
                 shown += 1
+            elif shape.shape_type == "image":
+                self._render_image_card(shape)
+                shown += 1
             elif (shape.text or "").strip():
                 self._render_text_card(shape)
                 shown += 1
@@ -320,6 +409,47 @@ class SlotMapperWindow:
             tk.Label(self.cards, text="No mappable shapes on this slide.",
                      font=("Segoe UI", 10), bg=self.t["card"],
                      fg=self.t["muted"]).pack(pady=30)
+        self._load_preview()
+
+    def _load_preview(self):
+        if self.preview_label is None:
+            return
+        from ui.utils import run_in_background
+        self._thumb_token += 1
+        token = self._thumb_token
+        self._thumb_ref = None
+        self.preview_label.config(image="", text="Loading preview…",
+                                  fg="#888888")
+        slide_num = self.current_slide + 1
+        source = self._source_pptx
+
+        def work():
+            from engine.pptx_thumbs import get_slide_preview
+            return get_slide_preview(source, slide_num, width=360)
+
+        def success(preview):
+            if token != self._thumb_token or \
+                    not self.window.winfo_exists():
+                return
+            if preview.get("kind") == "image":
+                from PIL import Image, ImageTk
+                with Image.open(preview["value"]) as img_file:
+                    image = img_file.copy()
+                image.thumbnail((350, 195), Image.LANCZOS)
+                self._thumb_ref = ImageTk.PhotoImage(image)
+                self.preview_label.config(image=self._thumb_ref, text="")
+            else:
+                self.preview_label.config(
+                    image="", text=preview.get("value", ""), fg="#B8B8B8",
+                    font=("Segoe UI", 8), justify="left", wraplength=340)
+
+        def error(exc):
+            logger.debug("Slide preview failed: %s", exc)
+            if token == self._thumb_token and self.window.winfo_exists():
+                self.preview_label.config(image="", text="No preview",
+                                          fg="#888888")
+
+        run_in_background(self.window, work, success, error)
 
     def _shape_slots(self, shape):
         return [(name, spec) for name, spec in self.ir.slot_registry.items()
@@ -365,6 +495,32 @@ class SlotMapperWindow:
         for name, spec in self._shape_slots(shape):
             self._render_slot_row(card, name, spec)
 
+    def _render_image_card(self, shape):
+        t = self.t
+        card = tk.Frame(self.cards, bg=t["card"],
+                        highlightbackground=SLOT_COLOR
+                        if self._shape_slots(shape) else "#2E8B57",
+                        highlightthickness=1)
+        card.pack(fill="x", padx=8, pady=4)
+        head = tk.Frame(card, bg=t["card"])
+        head.pack(fill="x", padx=8, pady=(5, 0))
+        tk.Label(head, text=f"{shape.name}  (picture)",
+                 font=("Segoe UI", 10, "bold"), bg=t["card"],
+                 fg=t["card_fg"]).pack(side="left")
+        tk.Button(head, text="Assign Image →",
+                  font=("Segoe UI", 9, "bold"), bg=ARMED_COLOR, fg="white",
+                  relief="flat", padx=10, pady=2,
+                  command=lambda: self._assign_selection(shape)
+                  ).pack(side="right")
+        tk.Label(card, text="Arm 🖼 Browse Image… in the sidebar, then "
+                            "Assign to swap this picture per client "
+                            "(crop and effects are kept).",
+                 font=("Segoe UI", 8), bg=t["card"], fg=t["muted"]
+                 ).pack(anchor="w", padx=8, pady=(0, 2))
+        for name, spec in self._shape_slots(shape):
+            self._render_slot_row(card, name, spec)
+        tk.Frame(card, bg=t["card"], height=4).pack()
+
     def _render_frame_card(self, shape):
         t = self.t
         card = tk.Frame(self.cards, bg=t["card"],
@@ -397,8 +553,12 @@ class SlotMapperWindow:
         t = self.t
         row = tk.Frame(card, bg=t["card"])
         row.pack(fill="x", padx=8, pady=(0, 3))
-        target = (f"“{spec['placeholder_text'][:32]}”"
-                  if spec.get("placeholder_text") else "whole box")
+        if spec.get("type") == "image":
+            target = "replaces the picture"
+        elif spec.get("placeholder_text"):
+            target = f"“{spec['placeholder_text'][:32]}”"
+        else:
+            target = "whole box"
         tk.Label(row, text=f"● {name} → {target}",
                  font=("Segoe UI", 9, "bold"), bg=t["card"], fg=SLOT_COLOR
                  ).pack(side="left")
@@ -407,6 +567,12 @@ class SlotMapperWindow:
         source = tk.Label(row, text=self._source_label(entry.get("query")),
                           font=("Segoe UI", 9), bg=t["card"], fg=t["card_fg"])
         source.pack(side="left", padx=(8, 4))
+
+        tk.Button(row, text="✕", font=("Segoe UI", 8), bg=t["danger"],
+                  fg="white", relief="flat", padx=4,
+                  command=lambda: self._remove_slot(name)).pack(side="right")
+        if spec.get("type") == "image":
+            return   # images have no format/preview machinery
 
         format_var = tk.StringVar(value=entry.get("format", spec["type"])
                                   if entry.get("format", spec["type"])
@@ -419,16 +585,52 @@ class SlotMapperWindow:
             slot_entry = self.mapping.setdefault("slots", {}).setdefault(
                 slot, {"query": None})
             slot_entry["format"] = var.get()
+            if var.get() != "date":
+                slot_entry.pop("format_details", None)
             self._render_slide()
         fmt.bind("<<ComboboxSelected>>", on_format)
+
+        if format_var.get() == "date":
+            self._render_date_style(row, name, entry)
 
         preview = self._preview_text(name, entry)
         if preview:
             tk.Label(row, text=preview, font=("Segoe UI", 9, "italic"),
                      bg=t["card"], fg="#2E8B57").pack(side="left")
-        tk.Button(row, text="✕", font=("Segoe UI", 8), bg=t["danger"],
-                  fg="white", relief="flat", padx=4,
-                  command=lambda: self._remove_slot(name)).pack(side="right")
+
+    def _render_date_style(self, row, name, entry):
+        """Date slots pick their style, like the classic format popup —
+        stored as format_details, honored by the same formatter."""
+        from engine.pptx_formats import DATE_STYLE_CHOICES
+        label_by_key = dict(DATE_STYLE_CHOICES)
+        key_by_label = {label: key for key, label in DATE_STYLE_CHOICES}
+        details = entry.get("format_details") or {}
+        current = details.get("date_style", "long_ordinal")
+        style_var = tk.StringVar(
+            value=label_by_key.get(current, label_by_key["long_ordinal"]))
+        style = ttk.Combobox(row, textvariable=style_var, width=16,
+                             state="readonly",
+                             values=list(key_by_label))
+        style.pack(side="left", padx=(0, 6))
+
+        def on_style(_event, slot=name, var=style_var):
+            key = key_by_label[var.get()]
+            new_details = {"format": "date", "date_style": key}
+            if key == "custom":
+                from tkinter import simpledialog
+                pattern = simpledialog.askstring(
+                    "Custom Date Format",
+                    "strftime pattern (e.g. %b %d, %Y):",
+                    parent=self.window)
+                if not pattern:
+                    return
+                new_details["custom_strftime"] = pattern
+            slot_entry = self.mapping.setdefault("slots", {}).setdefault(
+                slot, {"query": None})
+            slot_entry["format"] = "date"
+            slot_entry["format_details"] = new_details
+            self._render_slide()
+        style.bind("<<ComboboxSelected>>", on_style)
 
     # ── Actions ───────────────────────────────────────────────────────────
 
@@ -438,6 +640,9 @@ class SlotMapperWindow:
                 "Assign", "Arm a data source first (click one in the "
                 "sidebar), then highlight the text it should replace.",
                 parent=self.window)
+            return
+        if _source_kind(self.armed["query"])[0] == "image":
+            self._assign_image(shape)
             return
         selection = ""
         # Only a selection on THIS shape's own text widget counts
@@ -478,6 +683,43 @@ class SlotMapperWindow:
             "query": self.armed["query"], "format": default_format}
         self._render_slide()
 
+    def _assign_image(self, shape):
+        """An armed image replaces the shape's picture (whole shape —
+        selections don't apply). The file is copied into the template
+        store so the mapping stays portable."""
+        import shutil
+        source_path = self.armed["query"].get("image_path_abs", "")
+        if not os.path.isfile(source_path):
+            messagebox.showerror("Assign Image",
+                                 f"Image file not found:\n{source_path}",
+                                 parent=self.window)
+            return
+        existing = next(
+            (n for n, s in self._shape_slots_dict(shape).items()
+             if s.get("type") == "image"), None)
+        try:
+            name = existing or add_slot(self.ir, shape.shape_id, "",
+                                        name=f"{shape.name} image",
+                                        slot_type="image")
+        except (ValueError, KeyError) as e:
+            messagebox.showerror("Assign Image", str(e), parent=self.window)
+            return
+        assets_dir = os.path.join(self.template_dir, "assets")
+        os.makedirs(assets_dir, exist_ok=True)
+        ext = os.path.splitext(source_path)[1] or ".png"
+        rel = f"assets/{name}{ext}"
+        try:
+            shutil.copy2(source_path, os.path.join(self.template_dir, rel))
+        except OSError as e:
+            messagebox.showerror("Assign Image",
+                                 f"Could not copy the image into the "
+                                 f"template store:\n{e}", parent=self.window)
+            return
+        self.mapping.setdefault("slots", {})[name] = {
+            "query": {"image_path": rel, "image_path_abs": source_path},
+            "format": "text"}
+        self._render_slide()
+
     def _shape_slots_dict(self, shape):
         return {name: spec for name, spec in self.ir.slot_registry.items()
                 if spec.get("shape_id") == shape.shape_id}
@@ -509,6 +751,12 @@ class SlotMapperWindow:
     def _source_label(self, query):
         if query is None:
             return "(unmapped)"
+        if isinstance(query, dict) and "custom_text" in query:
+            return f"✏ “{query['custom_text'].splitlines()[0][:24]}”"
+        if isinstance(query, dict) and ("image_path" in query
+                                        or "image_path_abs" in query):
+            path = query.get("image_path") or query.get("image_path_abs")
+            return f"🖼 {os.path.basename(path)}"
         for option in self._source_catalog():
             if (option.get("query") or option.get("key")) == query:
                 return option["label"]

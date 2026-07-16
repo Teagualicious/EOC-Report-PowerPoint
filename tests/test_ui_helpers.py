@@ -159,3 +159,30 @@ def test_template_preview_returns_cached_image_path(tmp_path, monkeypatch):
     preview = pptx_thumbs.get_template_preview(str(template))
 
     assert preview == {"kind": "image", "value": str(png)}
+
+
+# ── grow_to_content sizing math (the mashed-button-bar fix class) ─────────────
+
+def test_grown_geometry_expands_to_content():
+    """A window whose content needs more room than its design size grows
+    to fit — buttons never mash or clip."""
+    from ui.utils import _grown_geometry
+    w, h = _grown_geometry(req_w=780, req_h=430, cur_w=560, cur_h=520,
+                           avail_w=1920, avail_h=1040, margin=18)
+    assert (w, h) == (780, 520)     # width grows, height keeps design size
+
+
+def test_grown_geometry_never_shrinks_below_design_size():
+    from ui.utils import _grown_geometry
+    w, h = _grown_geometry(req_w=300, req_h=200, cur_w=560, cur_h=400,
+                           avail_w=1920, avail_h=1040, margin=18)
+    assert (w, h) == (560, 400)
+
+
+def test_grown_geometry_clamps_to_work_area():
+    """On a small laptop the grown window still fits the usable desktop
+    (taskbar excluded), same contract as fit_window."""
+    from ui.utils import _grown_geometry
+    w, h = _grown_geometry(req_w=2400, req_h=1400, cur_w=560, cur_h=520,
+                           avail_w=1366, avail_h=728, margin=18)
+    assert w == 1366 - 36 and h == 728 - 36

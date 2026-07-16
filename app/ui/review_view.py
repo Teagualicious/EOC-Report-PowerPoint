@@ -465,3 +465,5 @@ class ReviewMixin:
         tk.Button(btn_frame, text="Cancel", font=("Segoe UI", 10),
                   bg=t["secondary"], fg=t["secondary_fg"], relief="flat", padx=15, pady=8,
                   command=win.destroy).pack(side="right")
+        from ui.utils import grow_to_content
+        grow_to_content(win)
