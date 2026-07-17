@@ -34,16 +34,30 @@ jobs:
           [ -n "$VERSION" ] || VERSION="$(tr -d ' \r\n' < VERSION)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Skip if already released
+      # A release can exist WITHOUT its download zips: the v1.35.0 run hit
+      # a GitHub replication race — `gh release upload` ran seconds after
+      # `gh release create` and got "release not found", leaving a
+      # source-only release that a plain re-run then skipped. So the guard
+      # is asset-aware: an existing release missing the portable zip gets
+      # its assets rebuilt and attached (repairable via manual dispatch).
+      - name: Skip if already released with assets
         id: released
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ steps.v.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::${{ steps.v.outputs.version }} already released — nothing to do."
-          else
+          VER="${{ steps.v.outputs.version }}"
+          if ! gh release view "$VER" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "assets=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "$VER" --repo "$GITHUB_REPOSITORY" \
+                 --json assets -q '.assets[].name' | grep -q "portable-win64.zip"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "assets=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$VER already released with downloads — nothing to do."
+          else
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "assets=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$VER exists but its download zips are missing — rebuilding and attaching them."
           fi
 
       - name: Extract top CHANGELOG entry
@@ -76,13 +90,13 @@ jobs:
       #     wheelhouse/ of Windows wheels; the launcher installs from it
       #     offline, so only Python itself must be on the machine.
       - name: Set up Python for the wheelhouse
-        if: steps.released.outputs.exists == 'false'
+        if: steps.released.outputs.assets == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Build download zips (standard + portable)
-        if: steps.released.outputs.exists == 'false'
+        if: steps.released.outputs.assets == 'false'
         run: |
           VER="${{ steps.v.outputs.version }}"
           mkdir -p build/src
@@ -101,10 +115,22 @@ jobs:
             "$GITHUB_WORKSPACE/IngestionEngine-$VER-portable-win64.zip" .)
 
       - name: Attach download zips to the release
-        if: steps.released.outputs.exists == 'false'
+        if: steps.released.outputs.assets == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ steps.v.outputs.version }}" \
-            "IngestionEngine-${{ steps.v.outputs.version }}.zip" \
-            "IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip" --clobber
+          # Retry: a freshly created release can 404 for a few seconds
+          # ("release not found") while GitHub replicates it — the exact
+          # failure that shipped v1.35.0 without its downloads.
+          VER="${{ steps.v.outputs.version }}"
+          for attempt in 1 2 3 4 5; do
+            if gh release upload "$VER" --repo "$GITHUB_REPOSITORY" \
+                 "IngestionEngine-$VER.zip" \
+                 "IngestionEngine-$VER-portable-win64.zip" --clobber; then
+              exit 0
+            fi
+            echo "Upload attempt $attempt failed — retrying in 10s"
+            sleep 10
+          done
+          echo "::error::Could not attach download zips after 5 attempts"
+          exit 1
