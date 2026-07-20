@@ -142,7 +142,10 @@ class SidebarMixin:
                 key = f"__custom_{hash(text)}__"
                 self.available_metrics[key] = text
                 self.selected_metric = key
-                self._pending_query = None
+                # The text rides IN the assignment as a query so it
+                # persists in the saved mapping — Auto-Fill used to find
+                # only the session-local __custom key and fill nothing
+                self._pending_query = {"custom_text": text}
                 self._pending_image = None
         tk.Button(row, text="Use", font=("Calibri", 8, "bold"),
                   bg=t["accent"], fg="white", relief="flat", padx=8,

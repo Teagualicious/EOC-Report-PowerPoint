@@ -117,6 +117,36 @@ def fill_template_report(template_path, output_path, mapping, metric_values):
                                  "format_details": smap.get("format_details"),
                                  "query": smap.get("query")}]
 
+            # Chart shapes: a saved Apply-as-Chart-Data query resolves to
+            # categories/series and injects via python-pptx's cache
+            # rewriter (series formatting untouched). Until now the
+            # built-in engine had NO chart path — chart data only ever
+            # reached the deck through the COM live preview, so Auto-Fill
+            # silently left charts showing template numbers.
+            if getattr(shape, "has_chart", False):
+                for asgn in assignments:
+                    query = asgn.get("query")
+                    if not (isinstance(query, dict)
+                            and query.get("output") == "chart"):
+                        continue
+                    from engine.query_resolver import resolve_query_payload
+                    from engine.template_ir.build import inject_chart_data
+                    payload = resolve_query_payload(
+                        query, metric_values.get("__client_data__", []),
+                        "chart")
+                    if payload is None:
+                        report.note_error(
+                            f"chart on slide {slide_num_str}: query "
+                            "matched no data rows")
+                        continue
+                    outcome = inject_chart_data(shape, payload)
+                    if outcome is None:
+                        report.note_filled()
+                    else:
+                        report.note_error(
+                            f"chart on slide {slide_num_str}: {outcome}")
+                continue
+
             for asgn in assignments:
                 metric_name = asgn.get("metric", "")
 

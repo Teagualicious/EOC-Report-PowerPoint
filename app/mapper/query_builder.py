@@ -319,6 +319,15 @@ def show_query_builder(wizard):
         wizard.selected_metric = key
         wizard._pending_query = q
         wizard._pending_image = None
+        # A chart's "Assign Chart Data…" button targeted this builder at a
+        # specific shape — Apply as Chart Data completes that assignment
+        # directly (saved as a real query, so Auto-Fill can re-resolve it)
+        target = getattr(wizard, "_chart_target", None)
+        if target is not None:
+            wizard._chart_target = None
+            finish = getattr(wizard, "_finish_chart_assign", None)
+            if q.get("output") == "chart" and finish is not None:
+                finish(target, key, q)
         # The applied query appears in the sidebar (Saved Queries) armed for
         # assignment — click a shape to place it, or re-click it later.
         try:
