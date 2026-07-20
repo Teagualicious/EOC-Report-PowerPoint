@@ -299,6 +299,7 @@ class PPTXWizard(SidebarMixin, SlideViewMixin):
 
     def _show_query_builder(self):
         """Advanced query builder (delegates to mapper.query_builder)."""
+        self._chart_target = None   # sidebar open — no chart is targeted
         show_query_builder(self)
 
     def _save_only(self):

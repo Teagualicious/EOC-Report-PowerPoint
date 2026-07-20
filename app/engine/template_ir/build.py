@@ -143,7 +143,7 @@ def _fill_slide_slots(slide, slide_ir, registry, slot_values, appended,
         wrapper = _wrap_shape(slide, element)
         slot_type = spec.get("type", "text")
         if slot_type == "chart_data":
-            outcome = _inject_chart_data(wrapper, slot_values[slot])
+            outcome = inject_chart_data(wrapper, slot_values[slot])
         elif slot_type == "table_data":
             outcome = _fill_table(wrapper, slot_values[slot], report, slot)
         elif slot_type == "image":
@@ -236,11 +236,13 @@ def _clone_chart_part(element, shape_ir, slide, template_dir, report):
         return False
 
 
-def _inject_chart_data(wrapper, payload):
-    """Replace a cloned chart's data with a chart payload
-    ({"categories", "series"}) via chart.replace_data — cached values and
-    the embedded workbook change, series formatting does not. Returns
-    None on success, else the unfilled reason."""
+def inject_chart_data(wrapper, payload):
+    """Replace a chart's data with a chart payload ({"categories",
+    "series"}) via chart.replace_data — cached values and the embedded
+    workbook change, series formatting does not. Works on any GraphicFrame
+    wrapper (cloned template-first charts AND in-place decks — the classic
+    fill engine uses this too). Returns None on success, else the
+    unfilled reason."""
     from pptx.chart.data import CategoryChartData
     if not isinstance(payload, dict):
         return "mapped value is not chart data"

@@ -126,6 +126,12 @@ def resolve_query(query, client_data, client_name="", start_date="", end_date=""
     if not isinstance(query, dict):
         return ""
 
+    # Custom text stored IN the assignment (not in the session's metric
+    # dict) — the classic mapper's __custom_<hash>__ keys only existed in
+    # memory, so Auto-Fill in a later session had nothing to resolve.
+    if "custom_text" in query:
+        return query["custom_text"]
+
     metric = query.get("metric", "")
     breakdown = query.get("breakdown", "all")
     filt = query.get("filter", "all")

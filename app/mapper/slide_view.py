@@ -132,24 +132,42 @@ class SlideViewMixin:
                            fg=t["muted"]).pack(side="right")
 
             if not is_skipped:
-                # Text preview with selectable text for partial replacement
-                preview = tk.Frame(sf, bg=sf.cget("bg"))
-                preview.pack(fill="x", padx=10, pady=(2, 5))
+                if shape.get("shape_type") == "chart" or shape.get("has_chart"):
+                    # Charts skip the metric-then-shape dance entirely:
+                    # one button opens the Advanced Query Builder and
+                    # Apply as Chart Data lands on THIS chart, saved as a
+                    # real query the built-in fill engine resolves.
+                    chart_row = tk.Frame(sf, bg=sf.cget("bg"))
+                    chart_row.pack(fill="x", padx=10, pady=(2, 5))
+                    tk.Label(chart_row, text="Chart — data comes from a "
+                                             "builder query:",
+                             font=("Calibri", 9), bg=sf.cget("bg"),
+                             fg=t["muted"]).pack(side="left")
+                    tk.Button(chart_row, text="📊 Assign Chart Data…",
+                              font=("Calibri", 8, "bold"), bg="#8B4513",
+                              fg="white", relief="flat", padx=8, pady=2,
+                              command=lambda sh=shape:
+                              self._assign_chart_via_builder(sh)
+                              ).pack(side="right", padx=(5, 0))
+                else:
+                    # Text preview with selectable text for partial replacement
+                    preview = tk.Frame(sf, bg=sf.cget("bg"))
+                    preview.pack(fill="x", padx=10, pady=(2, 5))
 
-                current_text = shape["text"][:100] if shape["text"] else "(empty)"
+                    current_text = shape["text"][:100] if shape["text"] else "(empty)"
 
-                text_widget = tk.Text(preview, height=2, width=50, font=("Calibri", 9),
-                                       bg=t["input_bg"], fg=t["fg"], relief="solid",
-                                       borderwidth=1, wrap="word")
-                text_widget.insert("1.0", current_text)
-                text_widget.config(state="normal")
-                text_widget.pack(side="left", fill="x", expand=True)
+                    text_widget = tk.Text(preview, height=2, width=50, font=("Calibri", 9),
+                                           bg=t["input_bg"], fg=t["fg"], relief="solid",
+                                           borderwidth=1, wrap="word")
+                    text_widget.insert("1.0", current_text)
+                    text_widget.config(state="normal")
+                    text_widget.pack(side="left", fill="x", expand=True)
 
-                def assign(sh=shape, tw=text_widget):
-                    self._assign_to_shape(sh, tw)
-                tk.Button(preview, text="Assign ←", font=("Calibri", 8, "bold"),
-                          bg=t["accent"], fg="white", relief="flat", padx=8, pady=2,
-                          command=assign).pack(side="right", padx=(5, 0))
+                    def assign(sh=shape, tw=text_widget):
+                        self._assign_to_shape(sh, tw)
+                    tk.Button(preview, text="Assign ←", font=("Calibri", 8, "bold"),
+                              bg=t["accent"], fg="white", relief="flat", padx=8, pady=2,
+                              command=assign).pack(side="right", padx=(5, 0))
 
                 # Show current assignment(s)
                 assignments_list = smap.get("assignments", [])
@@ -195,6 +213,32 @@ class SlideViewMixin:
 
         # Refresh slide preview thumbnail
         self.window.after(200, self._refresh_preview)
+
+    def _assign_chart_via_builder(self, shape):
+        """Open the Advanced Query Builder targeted at this chart:
+        Apply as Chart Data assigns the query straight onto it."""
+        self._chart_target = (
+            self.slides[self.current_slide]["slide_num"],
+            str(shape["shape_id"]), shape.get("shape_uid"),
+            shape.get("name"))
+        from mapper.query_builder import show_query_builder
+        show_query_builder(self)
+
+    def _finish_chart_assign(self, target, key, query):
+        """Called by the query builder's Apply as Chart Data when a chart
+        launched it. Saves the query as a real assignment (the built-in
+        fill engine re-resolves it on every Auto-Fill) and pushes the
+        data to the live preview when one is running."""
+        snum, sid, uid, name = target
+        self.model.assign_metric(snum, sid, key, fmt="chart",
+                                 query=dict(query), confirm_replace=True)
+        if self.live_preview and getattr(self, "_pending_chart_data", None):
+            self.live_preview.update_chart_data(
+                snum, int(sid), self._pending_chart_data,
+                shape_uid=uid, expected_name=name)
+        self._pending_chart_data = None
+        self._pending_query = None
+        self.selected_metric = None
 
     def _assign_to_shape(self, shape, text_widget):
         from mapper.mapping_model import NEEDS_CONFIRM

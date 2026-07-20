@@ -1,5 +1,28 @@
 # Changelog
 
+## July 17, 2026 - Classic mapper: custom text survives to Auto-Fill; charts assign straight from the query builder
+
+- **Custom text now holds from the mapper to Auto-Fill.** It used to
+  live only in the mapper session's metric list (`__custom_…__` keys),
+  so a later Auto-Fill had nothing to resolve and quietly skipped it.
+  The text now rides INSIDE the saved assignment as a
+  `{"custom_text": …}` query — the same resolver that re-computes
+  builder queries returns it on every fill, in any session. Existing
+  mappings are untouched; re-assign a custom text once to upgrade it.
+- **Charts: one button, one flow.** A chart shape in the mapper now
+  shows "📊 Assign Chart Data…" which opens the Advanced Query Builder
+  directly; Apply as Chart Data assigns the query straight onto that
+  chart (no metric-then-shape dance). The assignment is saved as a real
+  query in the mapping, and **the built-in fill engine now fills
+  charts**: on every Auto-Fill the query re-resolves through the same
+  pivot the builder displayed and the categories/series inject via the
+  cache rewriter — series colors and chart formatting untouched.
+  Previously chart data only ever reached the deck through the COM live
+  preview, so Auto-Fill left charts showing template numbers. The live
+  preview still updates immediately when active. Queries that match no
+  rows are reported in the fill summary, never silent.
+
+
 ## July 16, 2026 - Map Slots field-feedback: custom text, images, date styles, slide preview, sizing fixes
 
 - **Quick Fill parity + polish** (feedback round 2): ✏ Custom Text and
