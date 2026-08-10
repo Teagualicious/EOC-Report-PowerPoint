@@ -32,11 +32,11 @@ Produce a self-contained survivor codebase before implementing new product behav
 - [x] Moved mapper launch to `developer/run_mapper.bat` / `python -m app.mapper`.
 - [x] Removed `pywin32` and `tkcalendar` from runtime requirements.
 - [x] Survivor suite and architecture tests green: **313 passed**.
-- [ ] Stage 0 branch published as a draft PR.
+- [x] Stage 0 branch published as draft PR #1.
 
 ## Next
 
-1. Publish the Stage 0 branch as a draft PR and verify remote CI.
+1. Review draft PR #1 and resolve any remote CI or review findings.
 2. Stage 1: implement single-dump ingestion, stable fingerprints/import profiles, and the v0 campaign-dictionary passthrough using synthetic fixtures.
 3. Validate Stage 1 against a sanitized real export when one is supplied; until then, record real-file contact as RSK-2.
 
