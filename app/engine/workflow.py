@@ -1,241 +1,108 @@
-"""Headless end-to-end workflow service — the engine behind the AI-facing
-interfaces (``app/cli.py`` and ``app/mcp_server.py``).
+"""Headless Deck Engine workflow service.
 
-Mirrors the interactive Quick Run flow (ui.main_window / ui.client_wizard /
-ui.review_view) step for step, with no Tk imports anywhere on the path:
-
-    parse_files -> list_campaigns -> client_dataset -> kpis_for
-                                   -> export_workbook / fill_deck / query
-
-Every function takes and returns plain JSON-friendly Python data so callers
-can serialize results directly. Anything Windows/Office-specific keeps its
-existing graceful degradation (VBA injection falls back to plain .xlsx with
-a warning; deck filling always uses the python-pptx engine).
+The CLI and future Tk shell call only these functions. Fork Stage 0 establishes
+this dependency boundary; later stages implement parse, stage, and build behind
+these stable verbs. No function in this module imports Tk.
 """
 
-import logging
+from __future__ import annotations
+
 import os
+from typing import Any, Mapping
 
-from config.paths import OUTPUT_DIR, TEMPLATES_DIR
-from config.naming import unique_component
-from config.settings import load_platform_config, load_settings
-from engine.data_pipeline import (apply_platform_config,
-                                  filter_data_by_campaigns,
-                                  scan_file_structure)
-from engine.errors import IngestionError
-
-logger = logging.getLogger(__name__)
+from config.paths import (OUTPUT_DIR, PROJECT_ROOT, STAGING_DIR, TEMPLATES_DIR,
+                          ensure_dirs)
+from config.settings import load_settings, save_settings
 
 SUPPORTED_EXTENSIONS = (".csv", ".xlsx", ".xlsm", ".html", ".htm")
 
 
-def _native(value):
-    """Recursively convert numpy scalars to native Python so results
-    serialize as JSON numbers, not strings."""
+def _native(value: Any) -> Any:
+    """Recursively convert numpy/pandas scalars to JSON-native values."""
     if isinstance(value, dict):
-        return {k: _native(v) for k, v in value.items()}
+        return {str(key): _native(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
-        return [_native(v) for v in value]
+        return [_native(item) for item in value]
     item = getattr(value, "item", None)
     if callable(item) and not isinstance(value, (str, bytes)):
         try:
-            return value.item()
+            return item()
         except Exception:
             return value
     return value
 
 
-def list_platforms():
-    """Configured platforms and their sheet/column counts."""
-    settings = load_settings()
-    out = []
-    for name in sorted(settings.get("platforms", {})):
-        config = load_platform_config(name) or {}
-        sheets = config.get("sheets", [])
-        out.append({
-            "name": name,
-            "sheets": len(sheets),
-            "columns": sum(len(s.get("columns", [])) for s in sheets),
-        })
-    return out
+def _version() -> str:
+    path = os.path.join(PROJECT_ROOT, "VERSION")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return handle.read().strip()
+    except OSError:
+        return "0.0.0-unknown"
 
 
-def list_templates():
-    """Saved PowerPoint templates and whether each has a mapping."""
+def list_templates() -> list[dict[str, Any]]:
+    """Return saved PowerPoint templates and mapping availability."""
     from engine.pptx_mapper import list_available_templates
-    return [{"filename": t["filename"], "has_mapping": t["has_mapping"]}
-            for t in list_available_templates()]
+    return [
+        {"filename": item["filename"], "has_mapping": bool(item["has_mapping"])}
+        for item in list_available_templates()
+    ]
 
 
-def scan_export(path):
-    """Inspect an export's structure (sheets, headers, sample row) —
-    what Platform Setup shows when importing a sample file."""
-    if not os.path.isfile(path):
-        raise FileNotFoundError(f"No such file: {path}")
-    return scan_file_structure(path)
+def get_settings() -> dict[str, Any]:
+    """Return normalized application settings."""
+    return load_settings()
 
 
-def parse_files(file_platform_pairs):
-    """Parse exports with their platform configs, exactly like Quick Run.
-
-    Args:
-        file_platform_pairs: list of (filepath, platform_name).
-
-    Returns:
-        (parsed_list, failures) where failures is [(basename, reason)].
-    """
-    from parsers.csv_parser import CSVParser
-    from parsers.excel_parser import ExcelParser
-    from parsers.html_parser import HTMLParser
-
-    parsed = []
-    failures = []
-    for filepath, platform_name in file_platform_pairs:
-        name = os.path.basename(filepath)
-        if not os.path.isfile(filepath):
-            failures.append((name, "File not found"))
-            continue
-        config = load_platform_config(platform_name)
-        if not config:
-            failures.append(
-                (name, f"Platform '{platform_name}' has no saved config"))
-            continue
-        ext = os.path.splitext(filepath)[1].lower()
-        try:
-            if ext == ".csv":
-                data = CSVParser(filepath).parse(build_outputs=False)
-            elif ext in (".xlsx", ".xlsm"):
-                data = ExcelParser(filepath).parse(build_outputs=False)
-            elif ext in (".html", ".htm"):
-                data = HTMLParser(filepath, platform_name).parse()
-            else:
-                failures.append((name, "Unsupported file type"))
-                continue
-            apply_platform_config(data, config)
-            data["source_platform"] = platform_name
-            parsed.append(data)
-        except IngestionError as exc:
-            logger.warning("Parse failed for %s: %s", filepath, exc)
-            failures.append((name, exc.user_message))
-        except Exception as exc:
-            logger.exception("Parse failed for %s", filepath)
-            failures.append((name, str(exc)))
-    return parsed, failures
+def set_settings(updates: Mapping[str, Any]) -> dict[str, Any]:
+    """Merge and atomically persist settings."""
+    current = load_settings()
+    current.update(dict(updates))
+    return save_settings(current)
 
 
-def list_campaigns(parsed):
-    """Campaigns found in parsed data — what the client wizard offers."""
-    campaigns = []
-    seen = set()
-    for data in parsed:
-        plat = data.get("source_platform", "Unknown")
-        for mdata in data.get("campaign_metrics", {}).values():
-            cn = mdata.get("campaign_name", "")
-            if cn and cn not in seen:
-                campaigns.append({"name": cn, "platform": plat})
-                seen.add(cn)
-        for ld in data.get("level_data", []):
-            cn = ld.get("_campaign", "")
-            if cn and cn not in seen:
-                campaigns.append({"name": cn, "platform": plat})
-                seen.add(cn)
-    campaigns.sort(key=lambda c: (c["platform"], c["name"]))
-    return campaigns
+def describe_state() -> dict[str, Any]:
+    """Return the JSON-friendly state used by support and the future UI."""
+    ensure_dirs()
+    return {
+        "version": _version(),
+        "phase": "Fork Stage 0",
+        "analyst_ui_available": False,
+        "paths": {
+            "templates": TEMPLATES_DIR,
+            "staging": STAGING_DIR,
+            "output": OUTPUT_DIR,
+        },
+        "settings": get_settings(),
+        "templates": list_templates(),
+    }
 
 
-def client_dataset(parsed, client_name, campaigns=None, start_date="",
-                   end_date=""):
-    """Filter parsed data to one client's campaigns and stamp identity,
-    exactly like the client wizard hand-off. ``campaigns=None`` -> all."""
-    if campaigns is None:
-        campaigns = [c["name"] for c in list_campaigns(parsed)]
-    client_data = filter_data_by_campaigns(parsed, campaigns)
-    for data in client_data:
-        data["client_name"] = client_name
-        data["campaign_type"] = ""
-        data["start_date"] = start_date
-        data["end_date"] = end_date
-    return client_data
+def parse_dump(path: str, *, profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Parse one campaign export into Unified Data (implemented Stage 1)."""
+    del path, profile
+    raise NotImplementedError("Dump parsing is implemented in Fork Stage 1")
 
 
-def kpis_for(client_data):
-    """Review-screen numbers: KPI totals, per-campaign detail, data flags."""
-    from engine.kpi import compute_kpis
-    totals, details, flags = compute_kpis(client_data)
-    return _native({
-        "totals": totals,
-        "campaign_details": details,
-        "flags": [list(f) if isinstance(f, tuple) else f for f in flags],
-    })
+def generate_staging(dump_path: str, template_name: str | None = None) -> dict[str, Any]:
+    """Generate the analyst staging workbook (implemented Stage 2)."""
+    del dump_path, template_name
+    raise NotImplementedError("Staging generation is implemented in Fork Stage 2")
 
 
-def export_workbook(client_data, client_name, output_dir="",
-                    inject_vba=True):
-    """Write the unified Search/Data workbook for one client.
+def build_deck(staging_path: str | None = None) -> dict[str, Any]:
+    """Build a deck only from a saved staging workbook (implemented Stage 4)."""
+    del staging_path
+    raise NotImplementedError("Deck building is implemented in Fork Stage 4")
 
-    Same layout as the interactive export: <output>/<safe client>/<safe
-    client>_unified_report.xlsx (upgraded to .xlsm when VBA injection is
-    available). Returns path, row count, and any VBA warning.
-    """
-    from engine.excel_writer import write_to_excel
-    output_dir = output_dir or load_settings().get("output_folder", OUTPUT_DIR)
-    safe_client = unique_component(client_name, set(), fallback="Client")
-    client_folder = os.path.join(output_dir, safe_client)
-    os.makedirs(client_folder, exist_ok=True)
-    output_path = os.path.join(client_folder,
-                               f"{safe_client}_unified_report.xlsx")
-    final_path, vba_error = write_to_excel(client_data, output_path, "",
-                                           inject_vba=inject_vba)
-    rows = sum(len(d.get("campaign_metrics", {})) + len(d.get("level_data", []))
-               for d in client_data)
-    return {"path": final_path, "rows": rows, "vba_warning": vba_error}
+# ── Developer-only template authoring surface ────────────────────────────────
+# These commands are intentionally absent from the analyst UI but remain as the
+# tested maintenance path for app/mapper and engine/template_ir.
 
 
-def fill_deck(client_data, template_filename, output_path, client_name="",
-              start_date="", end_date=""):
-    """Fill a mapped PowerPoint template (python-pptx engine) and return
-    the saved path plus the FillReport dict — same as review Auto-Fill."""
-    from engine.fill_report import append_fill_history
-    from engine.metrics_catalog import get_available_metrics
-    from engine.pptx_fill import fill_template_report
-    from engine.pptx_mapper import load_template_mapping
-
-    template_path = os.path.join(TEMPLATES_DIR, template_filename)
-    if not os.path.isfile(template_path):
-        raise FileNotFoundError(
-            f"Template not found in workspace/templates: {template_filename}")
-    mapping = load_template_mapping(template_filename)
-    if not mapping:
-        raise ValueError(
-            f"No saved mapping for {template_filename} — map it in the "
-            "Template Mapper first.")
-
-    if not start_date or not end_date:
-        for d in client_data:
-            start_date = start_date or d.get("start_date", "")
-            end_date = end_date or d.get("end_date", "")
-    metrics, _ = get_available_metrics(client_data, client_name,
-                                       start_date, end_date)
-    metrics["__client_data__"] = client_data
-    metrics["__client_name__"] = client_name
-    metrics["__start_date__"] = start_date
-    metrics["__end_date__"] = end_date
-
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    path, report = fill_template_report(template_path, output_path,
-                                        mapping, metrics)
-    append_fill_history(report)
-    return {"path": path, "report": report.to_dict()}
-
-
-def ingest_template_store(pptx_path, template_id=None):
-    """Ingest a deck into the template-first store — or RE-ingest an
-    updated deck into its existing store, carrying review work forward
-    and returning the deltas (template-first Phase D).
-
-    Returns template dir/id, per-slide shape classifications, the slot
-    registry, and deltas ([] on a first ingest).
-    """
+def ingest_template_store(pptx_path: str, template_id: str | None = None) -> dict[str, Any]:
+    """Ingest or reconcile a deck in the developer template-first store."""
     from config.naming import storage_key
     from engine.template_ir import (classify_template, ingest_template,
                                     load_template_ir, reingest_template,
@@ -258,74 +125,65 @@ def ingest_template_store(pptx_path, template_id=None):
         deltas = []
 
     ir = load_template_ir(template_dir)
-    shapes = [{"shape_id": s.shape_id, "name": s.name,
-               "type": s.shape_type, "slide": slide.slide_index + 1,
-               "classification": s.classification,
-               "reason": s.classify_reason, "excluded": s.excluded}
-              for slide in ir.slides for s in slide.shapes]
-    return _native({"template_id": ir.template_id,
-                    "template_dir": template_dir,
-                    "shapes": shapes,
-                    "slots": ir.slot_registry,
-                    "deltas": deltas})
+    shapes = [
+        {
+            "shape_id": shape.shape_id,
+            "name": shape.name,
+            "type": shape.shape_type,
+            "slide": slide.slide_index + 1,
+            "classification": shape.classification,
+            "reason": shape.classify_reason,
+            "excluded": shape.excluded,
+        }
+        for slide in ir.slides
+        for shape in slide.shapes
+    ]
+    return _native({
+        "template_id": ir.template_id,
+        "template_dir": template_dir,
+        "shapes": shapes,
+        "slots": ir.slot_registry,
+        "deltas": deltas,
+    })
 
 
-def list_template_stores():
-    """Ingested template-first stores and whether each has a slot mapping."""
+def list_template_stores() -> list[dict[str, Any]]:
+    """List developer template-first stores and mapping readiness."""
     from engine.template_ir import load_slot_mapping, load_template_ir
     from engine.template_ir.ingest import list_template_stores as _stores
+
     out = []
     for store in _stores():
         try:
             ir = load_template_ir(store)
         except Exception:
-            logger.warning("Unreadable template store: %s", store,
-                           exc_info=True)
             continue
-        out.append({"template_id": ir.template_id, "template_dir": store,
-                    "slots": len(ir.slot_registry),
-                    "has_mapping": load_slot_mapping(store) is not None})
+        out.append({
+            "template_id": ir.template_id,
+            "template_dir": store,
+            "slots": len(ir.slot_registry),
+            "has_mapping": load_slot_mapping(store) is not None,
+        })
     return out
 
 
-def build_template_report(client_data, template, output_path,
-                          client_name="", start_date="", end_date=""):
-    """Build a deck from a template-first store (template-first pipeline;
-    the store must have a saved slot mapping).
-
-    ``template`` is a store directory path or a template_id under the
-    default store. Returns the saved path and the build report (shapes
-    copied, charts cloned, slots filled/unfilled, skips, notes).
-    """
+def build_template_report(client_data: list[dict[str, Any]], template: str,
+                          output_path: str, client_name: str = "",
+                          start_date: str = "", end_date: str = "") -> dict[str, Any]:
+    """Developer-only template-first build retained from the donor."""
     from engine.template_ir.ingest import TEMPLATE_STORE_DIR
     from engine.template_ir.mapping import build_mapped_report
 
     template_dir = template if os.path.isdir(template) \
         else os.path.join(TEMPLATE_STORE_DIR, template)
     if not os.path.isdir(template_dir):
-        raise FileNotFoundError(
-            f"No ingested template store named '{template}' — run "
-            "ingest_template first.")
+        raise FileNotFoundError(f"No ingested template store named '{template}'")
 
     if not start_date or not end_date:
-        for d in client_data:
-            start_date = start_date or d.get("start_date", "")
-            end_date = end_date or d.get("end_date", "")
+        for item in client_data:
+            start_date = start_date or item.get("start_date", "")
+            end_date = end_date or item.get("end_date", "")
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    path, report = build_mapped_report(template_dir, output_path,
-                                       client_data, client_name,
-                                       start_date, end_date)
+    path, report = build_mapped_report(
+        template_dir, output_path, client_data, client_name, start_date, end_date)
     return _native({"path": path, "report": report})
-
-
-def query_metric(client_data, metric, breakdown="all", agg="sum",
-                 metric_filter="all", client_name="", start_date="",
-                 end_date=""):
-    """Resolve an advanced query (same engine as mapped deck queries)."""
-    from engine.query_resolver import resolve_query
-    value = resolve_query(
-        {"metric": metric, "breakdown": breakdown, "filter": metric_filter,
-         "agg": agg},
-        client_data, client_name, start_date, end_date)
-    return _native({"metric": metric, "breakdown": breakdown, "agg": agg,
-                    "filter": metric_filter, "value": value})
