@@ -17,8 +17,11 @@ def _redirect_layout(monkeypatch, tmp_path):
         "MAPPINGS_DIR": str(workspace / "mappings"),
         "TEMPLATES_DIR": str(workspace / "templates"),
         "IMAGES_DIR": str(workspace / "templates" / "images"),
+        "STAGING_DIR": str(workspace / "staging"),
+        "DICTIONARY_DIR": str(workspace / "dictionary"),
         "INPUT_DIR": str(project / "input"),
         "OUTPUT_DIR": str(project / "output"),
+        "QUARANTINE_DIR": str(project / "output" / "_quarantine"),
         "LOGS_DIR": str(workspace / "logs"),
     }
     for name, value in values.items():
@@ -40,10 +43,11 @@ def test_source_layout_points_to_app_resources_and_root_user_folders():
 def test_ensure_dirs_creates_workspace_and_root_user_folders(monkeypatch, tmp_path):
     project, workspace = _redirect_layout(monkeypatch, tmp_path)
     paths.ensure_dirs()
-    for relative in ("mappings", "templates", "templates/images", "logs"):
+    for relative in ("mappings", "templates", "templates/images", "staging", "dictionary", "logs"):
         assert (workspace / relative).is_dir()
     assert (project / "input").is_dir()
     assert (project / "output").is_dir()
+    assert (project / "output" / "_quarantine").is_dir()
 
 
 def test_legacy_migration_is_copy_only_and_does_not_overwrite(monkeypatch, tmp_path):
@@ -107,7 +111,7 @@ def test_previous_default_output_setting_moves_to_root(monkeypatch, tmp_path):
 
     loaded = settings.load_settings()
     assert loaded["output_folder"] == str(project / "output")
-    assert loaded["theme"] == "dark"
+    assert loaded["theme"] == "light"
 
 
 def test_custom_output_setting_is_preserved(monkeypatch, tmp_path):

@@ -1,13 +1,5 @@
 name: Release
 
-# Creates the tag and GitHub Release for a finished PR (CLAUDE.md workflow
-# rule 5). Push-driven: bump the VERSION file (plus the CHANGELOG top entry,
-# which becomes the release notes) inside the PR — merging to main publishes
-# the release automatically. Remote Claude Code sessions cannot push tags or
-# call the release API, so no per-release API access is ever needed.
-# Manual dispatch remains as a fallback (version input overrides the file).
-# Already-released versions are skipped, so unrelated pushes are no-ops.
-
 on:
   push:
     branches: [main]
@@ -15,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag override, e.g. v1.25.0 (defaults to the VERSION file)"
+        description: "Release tag override (defaults to VERSION)"
         required: false
 
 permissions:
@@ -28,109 +20,59 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Resolve version
-        id: v
+        id: version
+        shell: bash
         run: |
           VERSION="${{ inputs.version }}"
           [ -n "$VERSION" ] || VERSION="$(tr -d ' \r\n' < VERSION)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      # A release can exist WITHOUT its download zips: the v1.35.0 run hit
-      # a GitHub replication race — `gh release upload` ran seconds after
-      # `gh release create` and got "release not found", leaving a
-      # source-only release that a plain re-run then skipped. So the guard
-      # is asset-aware: an existing release missing the portable zip gets
-      # its assets rebuilt and attached (repairable via manual dispatch).
-      - name: Skip if already released with assets
-        id: released
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VER="${{ steps.v.outputs.version }}"
-          if ! gh release view "$VER" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "assets=false" >> "$GITHUB_OUTPUT"
-          elif gh release view "$VER" --repo "$GITHUB_REPOSITORY" \
-                 --json assets -q '.assets[].name' | grep -q "portable-win64.zip"; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "assets=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::$VER already released with downloads — nothing to do."
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *dev* ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Development VERSION detected; no release will be published."
           else
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "assets=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::$VER exists but its download zips are missing — rebuilding and attaching them."
+            echo "publish=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Extract top CHANGELOG entry
-        if: steps.released.outputs.exists == 'false'
-        run: |
-          awk '/^## /{n++} n==1' documentation/CHANGELOG.md > release_notes.md
-          test -s release_notes.md || echo "See documentation/CHANGELOG.md." > release_notes.md
-          cat >> release_notes.md <<EOF
-
-          ---
-          **Which download?** Both zips run the same way: extract anywhere, double-click \`Start Ingestion Engine.bat\`.
-          - \`IngestionEngine-${{ steps.v.outputs.version }}.zip\` — standard: smaller, installs its packages from the internet on the first launch.
-          - \`IngestionEngine-${{ steps.v.outputs.version }}-portable-win64.zip\` — portable: bundles every package; the first launch sets them up offline (no network needed; requires Python 3.12 from python.org).
-          EOF
-
-      - name: Create tag and release
-        if: steps.released.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "${{ steps.v.outputs.version }}" \
-            --target "$GITHUB_SHA" \
-            --title "Ingestion Engine ${{ steps.v.outputs.version }}" \
-            --notes-file release_notes.md
-
-      # Two download zips:
-      #   IngestionEngine-<ver>.zip                 — standard: installs
-      #     packages from the internet on first run.
-      #   IngestionEngine-<ver>-portable-win64.zip  — same, plus a
-      #     wheelhouse/ of Windows wheels; the launcher installs from it
-      #     offline, so only Python itself must be on the machine.
-      - name: Set up Python for the wheelhouse
-        if: steps.released.outputs.assets == 'false'
+      - name: Set up Python 3.12
+        if: steps.version.outputs.publish == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Build download zips (standard + portable)
-        if: steps.released.outputs.assets == 'false'
+      - name: Build standard and offline archives
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
         run: |
-          VER="${{ steps.v.outputs.version }}"
+          VER="${{ steps.version.outputs.value }}"
           mkdir -p build/src
           git archive HEAD | tar -x -C build/src
-          (cd build/src && zip -qr "$GITHUB_WORKSPACE/IngestionEngine-$VER.zip" .)
-          mkdir build/src/wheelhouse
+          (cd build/src && zip -qr "$GITHUB_WORKSPACE/DeckEngine-$VER.zip" .)
+          mkdir -p build/src/wheelhouse
           python -m pip download -r app/requirements.txt -d build/src/wheelhouse \
             --platform win_amd64 --python-version 312 --only-binary=:all:
-          # pywin32's "sys_platform == win32" marker evaluates false on this
-          # Linux runner and pip skips it — fetch the Windows wheel explicitly
-          # (keep the version in sync with app/requirements.txt)
-          PYWIN32_PIN="$(grep -oE 'pywin32==[0-9]+' app/requirements.txt)"
-          python -m pip download "$PYWIN32_PIN" -d build/src/wheelhouse \
-            --platform win_amd64 --python-version 312 --only-binary=:all:
           (cd build/src && zip -qr \
-            "$GITHUB_WORKSPACE/IngestionEngine-$VER-portable-win64.zip" .)
+            "$GITHUB_WORKSPACE/DeckEngine-$VER-portable-win64.zip" .)
 
-      - name: Attach download zips to the release
-        if: steps.released.outputs.assets == 'false'
+      - name: Extract release notes
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        run: |
+          awk '/^## /{n++} n==1' documentation/CHANGELOG.md > release_notes.md
+          test -s release_notes.md || echo "See documentation/CHANGELOG.md." > release_notes.md
+
+      - name: Publish release
+        if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          # Retry: a freshly created release can 404 for a few seconds
-          # ("release not found") while GitHub replicates it — the exact
-          # failure that shipped v1.35.0 without its downloads.
-          VER="${{ steps.v.outputs.version }}"
-          for attempt in 1 2 3 4 5; do
-            if gh release upload "$VER" --repo "$GITHUB_REPOSITORY" \
-                 "IngestionEngine-$VER.zip" \
-                 "IngestionEngine-$VER-portable-win64.zip" --clobber; then
-              exit 0
-            fi
-            echo "Upload attempt $attempt failed — retrying in 10s"
-            sleep 10
-          done
-          echo "::error::Could not attach download zips after 5 attempts"
-          exit 1
+          VER="${{ steps.version.outputs.value }}"
+          if gh release view "$VER" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$VER already exists; replacing archive assets only."
+          else
+            gh release create "$VER" --target "$GITHUB_SHA" \
+              --title "Deck Engine $VER" --notes-file release_notes.md
+          fi
+          gh release upload "$VER" --repo "$GITHUB_REPOSITORY" \
+            "DeckEngine-$VER.zip" \
+            "DeckEngine-$VER-portable-win64.zip" --clobber

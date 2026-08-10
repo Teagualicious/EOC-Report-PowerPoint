@@ -1,17 +1,9 @@
-"""Central path constants for the application.
+"""Central, project-anchored paths for Deck Engine.
 
-The cleaned project layout separates program files from user-generated data:
-
-* ``APP_DIR`` - Python code and bundled resources under ``app/``.
-* ``PROJECT_ROOT`` - the folder containing the launcher and README.
-* ``RESOURCE_DIR`` - read-only files bundled with the application.
-* ``WORKSPACE_DIR`` - writable settings, mappings, templates, and logs.
-* ``INPUT_DIR`` / ``OUTPUT_DIR`` - user-facing folders at the project root.
-
-Under PyInstaller, bundled resources are read from ``sys._MEIPASS`` while the
-workspace remains beside the executable. ``APP_ROOT`` is retained as a
-backward-compatible alias for ``PROJECT_ROOT`` because older template mappings
-may contain paths relative to the project folder.
+All application-managed paths derive from :data:`PROJECT_ROOT`; business code
+must never depend on the shell's current working directory.  Under PyInstaller,
+read-only resources come from ``sys._MEIPASS`` while the writable workspace
+remains beside the executable.
 """
 
 from __future__ import annotations
@@ -23,7 +15,7 @@ import sys
 
 logger = logging.getLogger(__name__)
 
-if getattr(sys, "frozen", False):  # PyInstaller bundle
+if getattr(sys, "frozen", False):
     PROJECT_ROOT = os.path.dirname(sys.executable)
     APP_DIR = PROJECT_ROOT
     RESOURCE_DIR = os.path.join(
@@ -33,26 +25,27 @@ else:
     PROJECT_ROOT = os.path.dirname(APP_DIR)
     RESOURCE_DIR = os.path.join(APP_DIR, "resources")
 
-# Compatibility alias used by existing mapping/image resolution code.
+# Backward-compatible alias used by inherited mapping/image resolution code.
 APP_ROOT = PROJECT_ROOT
-
 WORKSPACE_DIR = os.path.join(PROJECT_ROOT, "workspace")
 
-# Read-only resources
+# Read-only resources.
 DICT_PATH = os.path.join(RESOURCE_DIR, "metric_dictionary.json")
 LOGO_PATH = os.path.join(RESOURCE_DIR, "assets", "logo.png")
 
-# Writable application state
+# Writable application state.
 SETTINGS_PATH = os.path.join(WORKSPACE_DIR, "settings.json")
 MAPPINGS_DIR = os.path.join(WORKSPACE_DIR, "mappings")
 TEMPLATES_DIR = os.path.join(WORKSPACE_DIR, "templates")
 IMAGES_DIR = os.path.join(TEMPLATES_DIR, "images")
+STAGING_DIR = os.path.join(WORKSPACE_DIR, "staging")
+DICTIONARY_DIR = os.path.join(WORKSPACE_DIR, "dictionary")
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 
-# User-facing source and report folders live at the project root for easier
-# navigation in File Explorer.
+# User-facing source and report folders.
 INPUT_DIR = os.path.join(PROJECT_ROOT, "input")
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
+QUARANTINE_DIR = os.path.join(OUTPUT_DIR, "_quarantine")
 
 
 def _copy_missing_tree(source: str, destination: str) -> int:
@@ -74,25 +67,17 @@ def _copy_missing_tree(source: str, destination: str) -> int:
 
 
 def migrate_legacy_layout() -> None:
-    """Copy data from older layouts into the current folder structure.
-
-    The migration is deliberately non-destructive: old files are left in place
-    until the user has verified the new build. Existing destination files
-    always win, so running this function repeatedly is safe.
-    """
+    """Copy inherited Jughead state into the fork layout non-destructively."""
     legacy_pairs = (
-        # Original root-level application state.
         (os.path.join(PROJECT_ROOT, "mappings"), MAPPINGS_DIR),
         (os.path.join(PROJECT_ROOT, "templates"), TEMPLATES_DIR),
         (os.path.join(PROJECT_ROOT, "logs"), LOGS_DIR),
-        # Original source staging name and the previous cleaned layout.
         (os.path.join(PROJECT_ROOT, "input_files"), INPUT_DIR),
         (os.path.join(WORKSPACE_DIR, "input"), INPUT_DIR),
         (os.path.join(WORKSPACE_DIR, "output"), OUTPUT_DIR),
     )
     total = 0
     for source, destination in legacy_pairs:
-        # Do not mistake the new workspace directory for a legacy source.
         if os.path.abspath(source) == os.path.abspath(destination):
             continue
         try:
@@ -110,18 +95,21 @@ def migrate_legacy_layout() -> None:
             logger.warning("Could not migrate legacy settings.json", exc_info=True)
 
     if total:
-        logger.info("Copied %d legacy data file(s) into the current layout", total)
+        logger.info("Copied %d legacy data file(s) into the Deck Engine layout", total)
 
 
 def ensure_dirs() -> None:
-    """Create writable directories and import legacy data if present."""
+    """Create every writable directory and import legacy data if present."""
     for path in (
         WORKSPACE_DIR,
         MAPPINGS_DIR,
         TEMPLATES_DIR,
         IMAGES_DIR,
+        STAGING_DIR,
+        DICTIONARY_DIR,
         INPUT_DIR,
         OUTPUT_DIR,
+        QUARANTINE_DIR,
         LOGS_DIR,
     ):
         os.makedirs(path, exist_ok=True)

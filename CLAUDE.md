@@ -1,55 +1,41 @@
 # CLAUDE.md
 
-Instructions for Claude Code sessions in this repository. Read STATUS.md before starting any work.
+Instructions for coding sessions in the Deck Engine repository. Read `STATUS.md` before changing anything and use `documentation/DECK_ENGINE_BUILDOUT.md` as the authoritative staged specification.
 
-## Project overview
+## Product
 
-Spectrum Reach Reporting Ingestion Engine — a local-first Windows desktop app (Tkinter) that converts advertising-platform exports (CSV/XLSX/XLSM/HTML) into searchable Excel workbooks and fills mapped PowerPoint report templates. Application code lives in `app/`, runtime state in `workspace/`; end users launch via `Start Ingestion Engine.bat`.
-
-Before changing application code, read `AI_CONTEXT.md` (design rules, business invariants, pitfalls) and `documentation/MODEL_HANDOFF.md` (authoritative architecture handoff). The Windows-only Office COM paths (Excel VBA injection, PowerPoint live preview) are not exercised by the automated suite — never claim them verified without a Windows/Office acceptance pass.
+Deck Engine is a local-first Windows reporting tool: one campaign dump → editable Excel staging workbook → deterministic PowerPoint deck. It is forked from Jughead Data Engine v1.36.0, preserving its tested parser, KPI, mapping, formatting, and PowerPoint fill cores.
 
 ## Stack
 
-- Python 3.11+ (standard library preferred over new dependencies)
-- Tests: pytest, in `tests/`
-- Dependencies: `requirements.txt` — do not add a dependency without noting why in the commit message
+- Python 3.11+; standard library before new dependencies
+- `pytest` tests in `tests/`
+- Runtime dependencies in `app/requirements.txt`
+- `openpyxl` for staging; `python-pptx` for fill; no runtime COM/pywin32
 
-## Workflow rules
+## Session workflow
 
-1. **Start of session:** read STATUS.md to learn current phase, what's done, and what's next. Do not re-derive project state from scratch.
-2. **Scope:** work only on the task given. If you notice unrelated problems, list them in STATUS.md under "Noticed" — do not fix them unprompted.
-3. **Tests are the gate.** Run `pytest` before declaring any task complete. A task with failing tests is not done. New behavior gets a new test.
-4. **End of session (every time):**
-   - Update STATUS.md: what changed, what's next, any decisions made
-   - Commit with a clear message
-   - Leave the repo in a state a fresh session can pick up with zero conversation context
-5. **Release after a PR — releases are push-driven.** When a PR's work is complete:
-   - Bump the root `VERSION` file inside the PR (the project's line continues from the inherited v1.22 demo build; bump the minor version for a normal batch of work, e.g. v1.25.0).
-   - Make sure the release is covered by the top entry of `documentation/CHANGELOG.md` — the release notes are taken from it.
-   - That's it: merging the PR to main triggers the **Release** workflow (`.github/workflows/release.yml`), which tags the merge commit and publishes the GitHub Release automatically. Remote Claude Code sessions cannot push tags or call the release API (the git proxy only allows the designated branch), so never attempt either — the VERSION bump is the release action.
-   - Record the version in STATUS.md's decisions log.
-   - Trivial bookkeeping/doc-only PRs (e.g. recording a release in STATUS.md) do not get their own release — leave VERSION untouched and the workflow won't fire.
-   - Fallback: the workflow still supports manual dispatch (Actions → Release → Run workflow) with an optional version override; it skips versions that already have a release.
+1. Read `STATUS.md`; do not re-derive project state from scratch.
+2. Work only on the named stage/task. Record unrelated findings in `STATUS.md`; do not fix them silently.
+3. Tests are the gate. Run `pytest`; new behavior gets tests. Run `python -m compileall -q app tests` for structural changes.
+4. Close every stage with a clear commit and an updated `STATUS.md` containing what changed, checks run, decisions, and the next entry condition.
+5. Publish through a branch and draft PR. Do not push feature work directly to `main`.
+6. `VERSION` drives releases only for non-development versions. Values containing `dev` must not publish a release.
 
-## Git notes for future sessions
+## Code and architecture rules
 
-- **GitHub's own merge commits are not yours to fix.** After a PR merges and the working branch is reset onto main, the branch tip is the PR merge commit that GitHub created server-side (committer `GitHub <noreply@github.com>`, GPG-signed with GitHub's web-flow key — it shows as **Verified** on GitHub). The stop hook's commit-signature check can misread it as an unverified local commit and suggest `git commit --amend --reset-author`. **Do not amend or rebase it** — rewriting a commit that already exists on main forks the branch's history. Just fast-forward push the branch (`git push -u origin <branch>`) so local and remote match, and only ever reset-author commits you actually authored in the session.
-- After a PR for the designated branch merges, restart the branch from main (`git fetch origin main && git checkout -B <branch> origin/main`) before follow-up work; merged PRs are never reused.
-- **Verify every merge actually landed.** GitHub has squash-merged a stale PR head twice (PRs #3 and #10): commits pushed to the branch after the PR was opened were silently missing from main, and once a release even shipped without them. After any merge, run `git fetch origin && git diff --stat origin/main origin/<branch>` — an empty diff means main has everything. If commits are missing, rebase them onto main (`git rebase --onto origin/main <last-merged-sha> <branch>`) and ship them as a follow-up PR with a fresh VERSION bump; never assume the merge was complete.
+- Minimal code that solves the current stage; no speculative managers/handlers.
+- Never remove trust-boundary validation, I/O error handling, or security checks.
+- `ui/` and `mapper/` may depend on `engine/`; `engine/` must never depend on Tk/UI.
+- All application paths derive from `config.paths`; never use the process CWD for business paths.
+- All user-controlled filesystem names go through `config.naming`.
+- The Stage 2 staging workbook is the only source of truth for Stage 4 fills. Filling from live parsed data is prohibited.
+- Literal staging values only; no runtime COM or formula-recalculation dependency.
 
-## Code style
+## Data hygiene
 
-- Minimal code that solves the stated problem. Reuse existing functions before writing new ones. Stdlib before dependencies. One line if one line works.
-- Never cut: input validation at trust boundaries, error handling around I/O, anything security-relevant.
-- No speculative abstractions. No "manager" or "handler" classes for things that happen once.
-- Match the existing style of the file being edited.
+No real client data, campaign data, credentials, or internal exports may be committed. Generate deterministic synthetic fixtures under `tests/` whenever a realistic shape is needed.
 
-## Data hygiene (non-negotiable)
+## Windows verification
 
-- No real client data, campaign data, credentials, or company-internal exports in this repo. Ever.
-- Test fixtures use synthetic data only (see `tests/fixtures/`).
-- If a task requires realistic data shapes, generate fake data matching the schema.
-
-## Phase discipline
-
-Work is organized in phases (see STATUS.md). A phase ends with: tests passing, STATUS.md updated, changes committed. Prefer finishing a phase over starting the next one.
+Office rendering, `os.startfile`, launcher behavior, DPI, file locks, and clean-machine installation are not exercised by Linux CI. Never claim those paths verified without the Windows acceptance checklist for their stage.

@@ -40,3 +40,13 @@ output/*
 
 # Offline wheelhouse (shipped only inside the portable release zip)
 wheelhouse/
+
+# Deck Engine generated working files
+workspace/staging/*
+!workspace/staging/.gitkeep
+workspace/dictionary/*
+!workspace/dictionary/.gitkeep
+output/_quarantine/*
+!output/_quarantine/.gitkeep
+!output/_quarantine/
+!output/_quarantine/.gitkeep
