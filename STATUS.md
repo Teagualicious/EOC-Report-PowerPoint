@@ -48,10 +48,28 @@ Produce a self-contained survivor codebase before implementing new product behav
   `DOCUMENTATION_STANDARDS.md`, `TESTING_STANDARDS.md`; updated `documentation/README.md`
   and `CLAUDE.md` reading order. Documentation only — no `app/` or `tests/` changes.
 - Checks: `python -m compileall -q app tests` clean; `pytest`: **313 collected, 298
-  passed, 15 failed on `ModuleNotFoundError: tkinter`** (container lacks Tk; the same
-  suite passes 313 in CI, which has tkinter). Baseline pinned: **313**.
-- The plan was reviewed by an adversarial review panel before merge; the report lives in
-  `documentation/reviews/HANDOFF_REVIEW_2026-08-20.md`.
+  passed, 15 failed on `ModuleNotFoundError: tkinter`** (container lacks Tk; 313 pass
+  where tkinter exists — verified by PR #1's green CI run, 2026-08-10). Baseline pinned:
+  **313 collected**.
+- The plan was reviewed by a three-lens adversarial panel (architecture/feasibility,
+  cold-start pickup, process/standards) before publishing; the report, ratings, and issue
+  dispositions live in `documentation/reviews/HANDOFF_REVIEW_2026-08-20.md` (committed in
+  the same change). All blocker and major findings were fixed in this pass.
+
+## Recorded findings (out of scope for this pass — do not fix silently)
+
+- **`python -m app` bootstrap bug:** crashes with `ModuleNotFoundError: No module named
+  'config'` (exit 1) instead of `app/main.py`'s intended exit 2 — `app/__main__.py` lacks
+  the `sys.path` bootstrap `app/cli.py` has. Fix scheduled with the Stage 5 entry-point
+  rework (or any earlier code-touching pass).
+- **Missing `T-ARCH-4` label:** `tests/test_architecture.py`'s fourth law test
+  (`test_stripped_runtime_modules_are_absent`) carries no `T-ARCH-4:` docstring label
+  unlike its siblings. Add the label in the next code-touching pass.
+- **`logging_setup.py` docstring** says 3 log backups; the code uses `backupCount=5`.
+  Correct the docstring on next touch.
+- **`documentation/upstream/` contains no EOC requirements document** despite the old
+  index claiming so (index corrected this pass); if a sanitized requirements/defect
+  review exists outside the repo, the owner may supply it for `documentation/`.
 
 ## Next
 

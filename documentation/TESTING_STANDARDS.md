@@ -14,8 +14,9 @@ python -m pytest -q                  # must match the count pinned in STATUS.md
 
 - **New behavior gets a new test in the same commit.** No exceptions for "obvious" code.
 - A stage cannot close with a failing or skipped-without-cause test.
-- The expected passing count is pinned in `STATUS.md`; changing it (up or down) is part of
-  the diff and gets a sentence explaining why.
+- The expected counts are pinned in `STATUS.md` — collected and passing stated separately
+  (currently 313 collected; 313 pass where tkinter exists, 298 without it). Changing them
+  (up or down) is part of the diff and gets a sentence explaining why.
 - Known environment gap: containers without `tkinter` fail `tests/test_ui_helpers.py` and
   `tests/test_query_builder_helpers.py` at import. CI (ubuntu, Python 3.12) has tkinter;
   treat local Tk-import failures as environmental, everything else as real.
@@ -38,8 +39,12 @@ Every stage's PR states which layers it touched and which manual checks were **n
 
 - **Synthetic only, deterministic always.** No real client data, campaign exports,
   credentials, or internal reports — ever, including "just for debugging". Fixtures are
-  generated in-test (see `tests/conftest.py`) or checked in under `tests/fixtures/` with
-  obviously fake identities (`FAKE-001`, `Acme Test Co`).
+  generated in-test (see `tests/conftest.py`, e.g. `Acme Appliance Co` / `Campaign A`) or
+  checked in under `tests/fixtures/` with obviously fake identities
+  (`FAKE-001` / `Acme Test Co` in `sample_synthetic.csv`). Note: `.gitignore` blocks
+  `*.xlsx` globally and whitelists only `tests/fixtures/*.csv` — generate binary fixtures
+  in-test, or add the matching `!tests/fixtures/*.xlsx` negation in the same commit that
+  checks one in.
 - No randomness without a fixed seed; no time-dependent assertions without freezing time.
 - Stage 1 delivers the shared **synthetic fixture factory**; later stages extend it rather
   than inventing parallel fixture styles.
@@ -50,9 +55,10 @@ Every stage's PR states which layers it touched and which manual checks were **n
   (`paths.TEMPLATES_DIR`, `MAPPINGS_DIR`, …) — never write into the real `workspace/`.
 - Module-global caches get autouse resets (pattern: `_reset_dictionary_cache`,
   `_isolate_fingerprints` in `conftest.py`). New global state must ship with its reset.
-- No network, no COM, no Office, no display in automated tests. UI helpers are tested
-  through fakes (`_FakeRoot`), dashboard endpoints through direct handler calls — no
-  browser, no bound port needed for logic tests.
+- No external network, no COM, no Office, no display in automated tests. Loopback sockets
+  are permitted **only** for the Stage 5 server-behavior tests (bind, token, POST-only);
+  everything else about the dashboard is tested through direct handler calls. UI helpers
+  are tested through fakes (`_FakeRoot`) — no browser, no bound port for logic tests.
 
 ## 5. Behavioral conventions
 
@@ -71,18 +77,26 @@ Every stage's PR states which layers it touched and which manual checks were **n
 
 ## 6. Per-stage minimums (forward-looking)
 
-- **Stage 1:** fingerprint stability under column reorder; unknown-fingerprint refusal;
-  malformed-input error quality; dictionary passthrough notes; 50k-row perf check.
-- **Stage 2:** full round-trip (write → close → reopen → read) per supported type; no
-  formulas/macros/links in output; unknown `SCHEMA_VERSION` fails loudly; atomic write
-  interrupted-write test.
+These are a **floor**, not the closing condition — the stage's gate paragraph in
+`DECK_ENGINE_BUILDOUT.md` decides when a stage is done.
+
+- **Stage 1:** known-profile replay determinism; fingerprint stability under column
+  reorder; unknown-fingerprint refusal; malformed-input error quality; dictionary
+  passthrough notes; 50k-row perf check.
+- **Stage 2:** full round-trip (write → close → reopen → read) per supported type,
+  including chart/table payload rows; no formulas/macros/links in output; unknown
+  `SCHEMA_VERSION` fails loudly; atomic write interrupted-write test; slot-keyed row
+  generation against a mapped template.
 - **Stage 3:** one focused test per blocking rule in the validation catalogue; a
-  warnings-never-block test; quarantine placement test.
+  warnings-never-block test; quarantine placement test; findings carry location and
+  remediation text; `workflow.validate_staging` + CLI `validate` contract tests.
 - **Stage 4:** builder-cannot-see-parsed-data architecture test; workbook → expected deck
-  golden test; unmapped/unfilled slot loudness; inherited golden suite untouched.
+  golden test; a `schemeClr`/theme-fidelity golden test (RSK-12); unmapped/unfilled slot
+  loudness; inherited golden suite untouched.
 - **Stage 5:** endpoint thin-shell test; token-required test; localhost-only bind test;
   sanitizer-on-inputs test; full synthetic flow through the HTTP layer; variant panel
-  renders from manifest with the flag off by default.
+  renders from manifest with the flag off by default; flow-state derivation from durable
+  artifacts.
 - **Stage 6:** launcher/settings/template-health covered by contract tests; Windows items
   go to the manual checklist.
 

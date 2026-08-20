@@ -1,6 +1,9 @@
 # Deck Engine AI context
 
-The authoritative plan is `documentation/DECK_ENGINE_BUILDOUT.md`; current state is `STATUS.md`.
+Reading order: `STATUS.md` (current state) → `documentation/HANDOFF.md` (context,
+architecture, decisions, phase plan) → `documentation/DECK_ENGINE_BUILDOUT.md` (stage
+gates, authoritative). `documentation/DOCUMENTATION_STANDARDS.md` and
+`documentation/TESTING_STANDARDS.md` are binding.
 
 Core invariant: **the saved staging workbook is the only source of truth for the PowerPoint fill.** Parsing, aliases, KPI aggregation, queries, and campaign rules resolve when staging is generated. Building a deck performs deterministic key→literal substitution plus image placement and must not consult live parsed data.
 

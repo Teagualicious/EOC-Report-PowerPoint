@@ -32,11 +32,16 @@ Parsing, alias resolution, KPI aggregation, queries, and campaign interpretation
 
 `app.engine.workflow` owns the application use cases:
 
-- `parse_dump(path, profile=None)`
-- `generate_staging(path, template=None, profile=None)`
-- `validate_staging(path)`
-- `build_deck(staging_path=None)`
-- settings, state, and template-list operations
+- `parse_dump(path, profile=None)` — stubbed today
+- `generate_staging(dump_path, template_name=None)` — stubbed today with this exact
+  signature; profile plumbing (whether a `profile` parameter is added) is decided at
+  Stage 2 alongside the key contract
+- `validate_staging(path)` — **does not exist yet, not even a stub; added in Stage 3**
+- `build_deck(staging_path=None)` — stubbed today
+- settings, state, and template-list operations — implemented
+- developer-only template-store verbs (`ingest_template_store`, `list_template_stores`,
+  `build_template_report`) — implemented; exempt from the staging-workbook fill law as a
+  maintenance path
 
 The CLI and UI remain thin shells. Engine modules never import Tk.
 
@@ -120,6 +125,7 @@ Deliverables:
 - structured `error`, `warning`, and `info` findings;
 - blocking checks for missing required sheets/keys, invalid contract versions, duplicate keys, unsafe paths, unresolved placeholders, non-finite numbers, malformed dates, and reconciliation breaks;
 - warnings for stale sources, unusual variances, optional blanks, and unsupported formatting;
+- `workflow.validate_staging(path)` delegating to `engine.validate`, plus a CLI `validate` subcommand, with contract tests (the verb does not exist before this stage);
 - quarantined output on failure.
 
 Gate: every blocking rule has a focused test; warnings never silently become blockers; analyst messages identify location and remediation.
@@ -129,7 +135,7 @@ Gate: every blocking rule has a focused test; warnings never silently become blo
 Deliverables:
 
 - build only from a validated saved staging workbook;
-- confirm decision DEC-5 at entry (template-first IR pipeline as the production build carrier; classic mapper path retained for golden regression and developer tooling);
+- confirm decision DEC-5 at entry (template-first IR pipeline as the production build carrier; classic mapper path retained for golden regression and developer tooling), including the RSK-12 theme/master fidelity decision — constrain templates to self-contained slide-level formatting or extend the builder to clone theme/master/background parts — proven either way by a golden test on a `schemeClr`-using synthetic template;
 - preserve template geometry, fonts, colors, number formats, persistent shape identity, chart formatting, and image placement;
 - interim default template with Spectrum Reach branding (synthetic content, committed with seeded template store and slot mapping; template selection stays configuration so the real template replaces it without code changes — DEC-6);
 - chart/table payloads read from literal staging-workbook content, never resolved from parsed data (DEC-8);

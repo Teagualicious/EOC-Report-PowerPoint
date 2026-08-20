@@ -9,6 +9,6 @@ Reading order for a new session: [`../STATUS.md`](../STATUS.md) →
 - [`TESTING_STANDARDS.md`](TESTING_STANDARDS.md) — binding internal test rules.
 - [`CHANGELOG.md`](CHANGELOG.md) — fork changes by release/development version.
 - [`reviews/`](reviews/) — dated review reports for this fork.
-- [`upstream/`](upstream/) — archived Jughead documentation and the EOC requirements/defect review used as design inputs. Context, not authority.
+- [`upstream/`](upstream/) — archived Jughead documentation used as design input. Context, not authority. (No EOC requirements document exists in the repo: the recorded requirements source is `HANDOFF.md` §1 and decisions DEC-1…DEC-4, owner-supplied 2026-08-20.)
 
 Analyst, maintenance, troubleshooting, and UAT documentation are Stage 7 deliverables. Until then, `STATUS.md` is the project-state source of truth.

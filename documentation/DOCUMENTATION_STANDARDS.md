@@ -12,14 +12,19 @@
 | `documentation/HANDOFF.md` | Context, architecture map, phase plan, decisions. | When architecture or plan changes |
 | `documentation/DECK_ENGINE_BUILDOUT.md` | Stage gates, controls, validation catalogue. | Only via a recorded decision |
 | `CLAUDE.md` | Session law: workflow, stack, hard rules. | Rarely; keep short |
-| `documentation/CHANGELOG.md` | What shipped, per version, removals named as prominently as additions. | Every stage close |
+| `documentation/CHANGELOG.md` | What shipped, per version, removals named as prominently as additions. | Every stage close or recorded decision pass |
 | `documentation/TESTING_STANDARDS.md` / this file | How to test / how to document. | Via recorded decision |
 | `documentation/reviews/` | Dated, immutable review reports (`NAME_YYYY-MM-DD.md`). | Append-only |
-| `documentation/proposals/` | Accepted-but-unscheduled designs, read with their paired review. | Append-only |
+| `documentation/proposals/` | Accepted-but-unscheduled designs, read with their paired review. (Created on first use.) | Append-only |
 | `documentation/upstream/` | Archived donor docs. **Context, not authority.** | Never (frozen) |
+| `AI_CONTEXT.md`, `README.md` (root) | Non-authoritative entry pointers; must link the documents above and never carry unique facts. | When pointers change |
 
-Never state the same fact authoritatively in two places — link to its home instead. If two
-documents disagree, the one higher in this table wins, and fixing the disagreement is part
+Never state the same fact authoritatively in two places — link to its home instead.
+Authority is **scoped by fact type, not by table position**: project state → `STATUS.md`;
+stage gates and controls → `DECK_ENGINE_BUILDOUT.md`; decisions, architecture, and plan →
+`HANDOFF.md`; session workflow and hard laws → `CLAUDE.md`. A document is authoritative
+only inside its scope — if it asserts something outside its scope that disagrees with the
+owning document, that assertion is a bug in the asserting document, and fixing it is part
 of the change that exposed it.
 
 ## 2. AI-compatibility rules (make docs machine-actionable)
