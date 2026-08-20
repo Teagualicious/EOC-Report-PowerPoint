@@ -15,7 +15,7 @@ python -m pytest -q                  # must match the count pinned in STATUS.md
 - **New behavior gets a new test in the same commit.** No exceptions for "obvious" code.
 - A stage cannot close with a failing or skipped-without-cause test.
 - The expected counts are pinned in `STATUS.md` — collected and passing stated separately
-  (currently 313 collected; 313 pass where tkinter exists, 298 without it). Changing them
+  (currently 322 collected and 322 pass in the bundled runtime). Changing them
   (up or down) is part of the diff and gets a sentence explaining why.
 - Known environment gap: containers without `tkinter` fail `tests/test_ui_helpers.py` and
   `tests/test_query_builder_helpers.py` at import. CI (ubuntu, Python 3.12) has tkinter;

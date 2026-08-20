@@ -2,7 +2,7 @@
 
 Every module obtains its logger with ``logging.getLogger(__name__)`` and
 never attaches handlers itself; this module owns the handlers. Logs land
-in ``workspace/logs/deck_engine.log`` (rotating, 3 backups) so a support
+in ``workspace/logs/deck_engine.log`` (rotating, 5 backups) so a support
 person can ask an AE to send the file when something goes wrong on a
 machine we can't touch.
 """

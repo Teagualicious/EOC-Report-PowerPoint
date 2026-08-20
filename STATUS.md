@@ -4,7 +4,7 @@
 
 ## Current phase
 
-**Planning pass complete (2026-08-20) — ready to enter Stage 1.**
+**Stage 1 complete (2026-08-20) — ready to enter Stage 2.**
 
 Stage 0 (fork surgery and architecture harness) is done and merged (PR #1). A planning
 session on 2026-08-20 locked the product direction with the owner, produced
@@ -40,17 +40,27 @@ Produce a self-contained survivor codebase before implementing new product behav
 - [x] Removed `pywin32` and `tkcalendar` from runtime requirements.
 - [x] Survivor suite and architecture tests green: **313 passed**.
 - [x] Stage 0 branch published as draft PR #1.
+- [x] Stage 1 ingestion core implemented on the local `codex/stage-1-ingestion`
+  branch: CSV/XLSX/XLSM/HTML inspection, stable structure fingerprints,
+  schema-versioned import profiles, explicit profile-required refusal, v0
+  campaign-dictionary passthrough, reconciliation output, and deterministic
+  synthetic fixtures.
+- [x] Stage 1 tests cover known-profile replay, column-order invariance, structural
+  changes, malformed inputs, all supported formats, dictionary notes, and the
+  50,000-row performance budget.
 
-## Planning pass 2026-08-20 — what changed and checks run
+## Planning pass and Stage 1 implementation 2026-08-20 — what changed and checks run
 
 - Added `documentation/HANDOFF.md`; amended `DECK_ENGINE_BUILDOUT.md` (Stage 5 →
   localhost dashboard; Stage 4 + interim branded template; Stage 6 launcher); added
   `DOCUMENTATION_STANDARDS.md`, `TESTING_STANDARDS.md`; updated `documentation/README.md`
-  and `CLAUDE.md` reading order. Documentation only — no `app/` or `tests/` changes.
-- Checks: `python -m compileall -q app tests` clean; `pytest`: **313 collected, 298
-  passed, 15 failed on `ModuleNotFoundError: tkinter`** (container lacks Tk; 313 pass
-  where tkinter exists — verified by PR #1's green CI run, 2026-08-10). Baseline pinned:
-  **313 collected**.
+  and `CLAUDE.md` reading order. Stage 1 then added
+  `app/engine/ingestion.py`, `app/engine/synthetic_fixtures.py`, the v0 dictionary
+  implementation, parser error checks, and contract tests. The Stage 0 architecture
+  label and logging-backup documentation drift were corrected on the next code touch.
+- Checks: `python -m compileall -q app tests` clean; `python -m pytest -q`:
+  **322 passed**. The bundled runtime includes tkinter, so the prior container-only
+  Tk import gap did not occur in this run.
 - The plan was reviewed by a three-lens adversarial panel (architecture/feasibility,
   cold-start pickup, process/standards) before publishing; the report, ratings, and issue
   dispositions live in `documentation/reviews/HANDOFF_REVIEW_2026-08-20.md` (committed in
@@ -62,25 +72,20 @@ Produce a self-contained survivor codebase before implementing new product behav
   'config'` (exit 1) instead of `app/main.py`'s intended exit 2 — `app/__main__.py` lacks
   the `sys.path` bootstrap `app/cli.py` has. Fix scheduled with the Stage 5 entry-point
   rework (or any earlier code-touching pass).
-- **Missing `T-ARCH-4` label:** `tests/test_architecture.py`'s fourth law test
-  (`test_stripped_runtime_modules_are_absent`) carries no `T-ARCH-4:` docstring label
-  unlike its siblings. Add the label in the next code-touching pass.
-- **`logging_setup.py` docstring** says 3 log backups; the code uses `backupCount=5`.
-  Correct the docstring on next touch.
 - **`documentation/upstream/` contains no EOC requirements document** despite the old
   index claiming so (index corrected this pass); if a sanitized requirements/defect
   review exists outside the repo, the owner may supply it for `documentation/`.
 
 ## Next
 
-1. **Stage 1 entry condition:** read `documentation/HANDOFF.md` §7 Phase 1; implement
-   single-dump ingestion through `workflow.parse_dump`, stable fingerprints/import
-   profiles, the v0 campaign-dictionary passthrough, and the deterministic synthetic
-   fixture factory. Tests per `TESTING_STANDARDS.md` §6 Stage 1.
-2. Validate Stage 1 against a sanitized real export when one is supplied; until then,
-   record real-file contact as RSK-2 (owner confirmed synthetic-first, DEC-4).
-3. Open questions Q1–Q5 in `HANDOFF.md` §10 have named decide-at stages — answer them
-   there, not before.
+1. **Stage 2 entry condition:** read `documentation/HANDOFF.md` §7 Phase 2 and
+   `documentation/DECK_ENGINE_BUILDOUT.md` Stage 2; implement the literal,
+   versioned staging workbook writer/reader from the parsed Stage 1 contract.
+2. Preserve the Stage 1 profile/refusal behavior and validate against a sanitized
+   real export only when one is supplied; until then, real-file contact remains
+   RSK-2 (owner confirmed synthetic-first, DEC-4).
+3. Open questions Q1–Q5 in `HANDOFF.md` §10 have named decide-at stages — answer
+   them there, not before.
 
 ## Decisions log
 

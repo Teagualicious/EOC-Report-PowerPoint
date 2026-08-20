@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-dev (2026-08-20) — Stage 1: deterministic ingestion core
+
+- Added `engine.ingestion` structure inspection, order-independent fingerprints,
+  schema-versioned import profiles, explicit profile-required refusal, and source
+  reconciliation output.
+- Implemented `workflow.parse_dump` for CSV, XLSX, XLSM, and HTML exports while
+  keeping profile application explicit and the engine headless.
+- Added the v0 campaign-dictionary identity passthrough and shared deterministic
+  synthetic fixture factory for all supported export formats.
+- Added malformed CSV/header checks and Stage 1 contract/performance coverage.
+- Verification: `python -m pytest -q` — **322 passed**; no Windows/Office checks
+  were performed.
+
 ## 0.1.0-dev (2026-08-20) — Planning pass: handoff, standards, dashboard direction
 
 - Added `documentation/HANDOFF.md` (context, architecture map, decisions DEC-1…DEC-8, phase plan, pickup guide).

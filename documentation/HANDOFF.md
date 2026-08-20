@@ -216,8 +216,41 @@ input/<dump>.(csv|xlsx|xlsm|html)
       sheets: Report Values · Images · Chart & Table Data (DEC-8) · Unified Data · _Meta
       (today staging.py has SCHEMA_VERSION=1 and four sheet constants; the payload
        sheet joins the contract when the Stage 2 writer ships — no bump needed, DEC-8)
-  → engine.validate.validate_ingest/validate_fill → Finding list            [Stage 3]
+      → engine.validate.validate_ingest/validate_fill → Finding list            [Stage 3]
 ```
+
+### 6.2.1 Stage 1 ingestion contract
+
+`app/engine/ingestion.py` owns structure inspection and profile validation;
+`workflow.parse_dump` remains the only public use-case boundary. A profile is
+stored as `workspace/mappings/profile_<fingerprint>.json` with schema version 1:
+
+```json
+{
+  "schema_version": 1,
+  "fingerprint": "64 lowercase SHA-256 hex characters",
+  "source_type": "csv|excel|html",
+  "sheets": [{
+    "sheet_name": "source sheet name",
+    "columns": [{
+      "column": "source header",
+      "role": "campaign_id|level: <prefix>|metric|skip",
+      "selected": true
+    }]
+  }]
+}
+```
+
+The fingerprint uses normalized source type, sheet names, and sorted header
+multisets. It excludes filenames, row values, and column order. A new or
+mismatched fingerprint returns `status: profile_required` with `structure`,
+`fingerprint`, `profile`, and `profile_path`; it does not return interpreted
+campaign rows and never falls back to automatic role guessing. A matching
+profile returns parser-compatible tables plus `unified_rows`, a v0 campaign
+dictionary note set, and a deterministic `reconciliation` report. The report
+records source/resolved row counts and per-metric source-cell versus resolved-row
+counts. `engine.synthetic_fixtures` is the shared deterministic fake-export
+factory for CSV, XLSX/XLSM, and HTML tests; it contains no client data.
 
 KPI laws already encoded in the live cores and their tests (**do not "simplify"**):
 
@@ -340,11 +373,17 @@ stage's spec.
 ### Phase 0 — Fork surgery & architecture harness ✅ DONE (PR #1)
 313-test survivor suite green; laws enforced; parse/stage/build verbs stubbed.
 
-### Phase 1 — Ingestion core (Step 1, part A) — buildout Stage 1
+### Phase 1 — Ingestion core (Step 1, part A) — buildout Stage 1 ✅ DONE
 **Objective:** one dump in, deterministic structured data out — never guessing.
 Deltas: the synthetic fixture factory is the shared foundation every later phase extends
 (TESTING_STANDARDS §3); the import-profile *schema* gets defined and documented here
 (feeds Q6 — the Stage 5 profile editor edits this contract).
+
+Implemented on 2026-08-20: all four supported source formats, stable structure
+fingerprints, persisted schema-versioned profiles, explicit profile refusal for
+unknown structures, v0 campaign identity passthrough, reconciliation output, and
+the 50,000-row synthetic performance check. Stage 2 owns the first workbook
+writer/reader entry condition.
 
 ### Phase 2 — Staging workbook writer/reader (Step 1, part B) — buildout Stage 2
 **Objective:** the literal, editable, versioned workbook that is the product's center —
@@ -449,11 +488,11 @@ RSK-1…RSK-8 from the buildout still stand. Added this pass:
    regression; CI has tkinter.
 3. Work **only** the stage named in `STATUS.md` → *Next*. Unrelated findings go into
    `STATUS.md`, not into the diff.
-4. What runs today: `python -m app.cli list-templates|state|settings`, plus the hidden
+4. What runs today: `python -m app.cli list-templates|state|settings|parse`, plus the hidden
    developer commands `python -m app.cli ingest-template --pptx …` and `template-stores`
    (suppressed from `--help`; they drive the template-store tooling DEC-6 seeding uses).
-   The developer mapper runs via `python -m app.mapper` (Windows). `parse`/`stage`/`build`
-   raise `NotImplementedError` until their stages land; there is no `validate` command yet
+   The developer mapper runs via `python -m app.mapper` (Windows). `stage`/`build` raise
+   `NotImplementedError` until their stages land; there is no `validate` command yet
    (Stage 3). **Known bug:** `python -m app` does *not* exit 2 as `app/main.py` intends —
    it crashes with `ModuleNotFoundError: No module named 'config'` (exit 1) because
    `app/__main__.py` lacks the `sys.path` bootstrap `app/cli.py` has; recorded in

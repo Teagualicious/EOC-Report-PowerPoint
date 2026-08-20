@@ -105,7 +105,7 @@ class HTMLParser:
     def _detect_tables(self, soup):
         """Find all HTML tables and extract headers + rows as dicts."""
         detected = []
-        for table in soup.find_all("table"):
+        for table_index, table in enumerate(soup.find_all("table"), start=1):
             headers = []
             thead = table.find("thead")
             if thead:
@@ -142,6 +142,7 @@ class HTMLParser:
                     "headers": headers,
                     "rows": rows,
                     "row_count": len(rows),
+                    "sheet_name": f"Table {table_index}",
                 })
         return detected
 

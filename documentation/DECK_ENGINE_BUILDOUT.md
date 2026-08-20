@@ -32,7 +32,7 @@ Parsing, alias resolution, KPI aggregation, queries, and campaign interpretation
 
 `app.engine.workflow` owns the application use cases:
 
-- `parse_dump(path, profile=None)` — stubbed today
+- `parse_dump(path, profile=None)` — implemented in Stage 1 with explicit profile refusal
 - `generate_staging(dump_path, template_name=None)` — stubbed today with this exact
   signature; profile plumbing (whether a `profile` parameter is added) is decided at
   Stage 2 alongside the key contract
