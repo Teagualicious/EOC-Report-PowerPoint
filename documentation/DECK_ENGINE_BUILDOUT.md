@@ -2,6 +2,13 @@
 
 This is the repository-facing execution plan distilled from the full Deck Engine fork handoff. `STATUS.md` records current state; this document defines the target architecture, ordered stages, gates, and non-negotiable controls.
 
+> **Amended 2026-08-20** per owner decisions DEC-1…DEC-4 and engineering decisions
+> DEC-5…DEC-8 (see [`HANDOFF.md`](HANDOFF.md) §3–4): the Stage 5 analyst UI is a
+> **localhost web dashboard**, not the Tkinter window originally planned; Stage 4 adds the
+> interim Spectrum-branded default template; per-page content variants are wireframed in
+> Stage 5 and activated only when the real template arrives. `HANDOFF.md` carries the
+> context and architecture map; this file remains the gate authority.
+
 ## Product outcome
 
 Deck Engine is a local-first Windows reporting tool with one analyst workflow:
@@ -122,30 +129,39 @@ Gate: every blocking rule has a focused test; warnings never silently become blo
 Deliverables:
 
 - build only from a validated saved staging workbook;
+- confirm decision DEC-5 at entry (template-first IR pipeline as the production build carrier; classic mapper path retained for golden regression and developer tooling);
 - preserve template geometry, fonts, colors, number formats, persistent shape identity, chart formatting, and image placement;
+- interim default template with Spectrum Reach branding (synthetic content, committed with seeded template store and slot mapping; template selection stays configuration so the real template replaces it without code changes — DEC-6);
+- chart/table payloads read from literal staging-workbook content, never resolved from parsed data (DEC-8);
 - loud reporting of missing mappings or unmatched chart queries;
 - atomic output and golden-deck semantic tests.
 
 Gate: the builder cannot access parsed-data objects, the full inherited golden fill suite remains green, and a deterministic synthetic workbook produces the expected deck.
 
-### Stage 5 — Analyst UI
+### Stage 5 — Analyst dashboard (amended 2026-08-20, DEC-1/DEC-2/DEC-3)
+
+The analyst UI is a **localhost web dashboard**, not a Tkinter window. A stdlib HTTP
+server bound to `127.0.0.1` with a per-run auth token serves a single-page frontend and a
+JSON API that is a thin shell over `engine.workflow` (DEC-7).
 
 Deliverables:
 
-- one light-theme window with explicit states: no source, profile needed, ready to stage, staging generated, validation blocked/warned, ready to build, complete;
-- source/template selection, profile editor, progress, findings, output links, and recovery actions;
-- background work through a bounded worker bridge; no business logic in callbacks;
-- keyboard, DPI, small-screen, cancellation, and file-lock handling.
+- one guided dashboard with explicit states: no source, profile needed, ready to stage, staging generated, validation blocked/warned, ready to build, complete;
+- source/template selection, profile editor, progress, findings with remediation text, output links, and recovery actions;
+- "Open in Excel" step: the dashboard opens the staging workbook in desktop Excel; the analyst edits and saves there; the dashboard re-validates the saved file (DEC-2) — no in-browser value editing;
+- per-page content checkbox panel, wireframed and clearly marked as a future feature behind a default-off flag until the real template identifies which pages vary (DEC-3); choices persist into the staging workbook so builds stay workbook-driven;
+- security: localhost-only bind, token required on every request, POST-only mutations, all user-supplied names through `config.naming`;
+- new architecture tests: engine never imports the dashboard package; the dashboard never imports Tk; endpoints stay thin.
 
-Gate: an analyst completes the full workflow without terminal access; UI state is derived from workflow results rather than duplicate flags.
+Gate: an analyst completes the full workflow without terminal access; UI state is derived from workflow results rather than duplicate flags; the full synthetic flow is exercised headlessly through the HTTP layer in tests.
 
 ### Stage 6 — Settings, template management, and launcher
 
 Deliverables:
 
-- minimal settings for output, default template, and safe preferences;
-- template import/list/remove with mapping-health checks;
-- release-safe Windows launcher and portable package;
+- minimal settings for output, default template, and safe preferences, editable from the dashboard;
+- template import/list/remove with mapping-health checks (covering both mapping systems);
+- release-safe Windows launcher (`Run Deck Engine.bat` starts the dashboard server and opens the default browser) and portable package;
 - development versions excluded from automatic releases.
 
 Gate: clean-machine install and launcher checks pass on Windows; missing Office does not break non-rendering paths.
@@ -172,13 +188,15 @@ Gate: ambiguous campaigns remain visible and unresolved unless an approved rule 
 
 ## Test strategy
 
-Every behavior change receives a test. Required layers:
+The binding rules live in [`TESTING_STANDARDS.md`](TESTING_STANDARDS.md); documentation
+obligations live in [`DOCUMENTATION_STANDARDS.md`](DOCUMENTATION_STANDARDS.md). Every
+behavior change receives a test. Required layers:
 
 - unit tests for normalization, fingerprints, aliases, formatting, validation, and path safety;
 - contract tests for workflow result shapes and staging versions;
 - integration tests for parse → stage → reopen → validate → fill;
 - semantic golden-deck tests using `python-pptx`, not binary file equality;
-- architecture tests for dependency direction, path anchoring, sanitizer ownership, and source-of-truth isolation;
+- architecture tests for dependency direction, path anchoring, sanitizer ownership, and source-of-truth isolation (extended in Stage 5: engine never imports the dashboard, the dashboard never imports Tk, endpoints stay thin);
 - performance checks for representative 50,000-row exports;
 - manual Windows checks only where automation is not credible: Office rendering, DPI, launchers, locks, and clean-machine packaging.
 
