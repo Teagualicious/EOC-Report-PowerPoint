@@ -11,5 +11,22 @@ from typing import Any
 
 
 def apply(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
-    """Return transformed Unified Data rows and human-readable notes."""
-    raise NotImplementedError("Campaign dictionary v0 is implemented in Stage 1")
+    """Return identity-preserved rows and deterministic analyst notes.
+
+    Stage 1 intentionally has no campaign aliases or normalization rules.  The
+    explicit identity pass keeps the seam stable for Stage 8 while making the
+    absence of interpretation visible to the analyst and to reconciliation
+    reports.  Input dictionaries are copied so a later dictionary version
+    cannot mutate parser-owned data in place.
+    """
+    preserved = [dict(row) for row in rows]
+    campaigns = sorted({
+        str(row.get("campaign_name", ""))
+        for row in preserved
+        if row.get("campaign_name", "")
+    })
+    notes = [
+        "Campaign dictionary v0 identity passthrough: no campaign rules were applied.",
+        f"Campaign dictionary v0 retained {len(campaigns)} campaign name(s) unchanged.",
+    ]
+    return preserved, notes

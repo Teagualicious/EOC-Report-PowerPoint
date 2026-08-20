@@ -72,6 +72,7 @@ print(json.dumps(sorted(name for name in sys.modules if name.startswith('tkinter
 
 
 def test_stripped_runtime_modules_are_absent():
+    """T-ARCH-4: removed Stage 0 runtime modules must stay absent."""
     stripped = [
         APP / "mcp_server.py",
         APP / "engine" / "excel_writer.py",

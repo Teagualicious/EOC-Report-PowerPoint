@@ -29,8 +29,6 @@ def test_stage_scaffolds_have_stable_public_boundaries():
 def test_future_stage_calls_fail_loudly_not_silently():
     from engine import workflow
 
-    with pytest.raises(NotImplementedError, match="Stage 1"):
-        workflow.parse_dump("synthetic.xlsx")
     with pytest.raises(NotImplementedError, match="Stage 2"):
         workflow.generate_staging("synthetic.xlsx")
     with pytest.raises(NotImplementedError, match="Stage 4"):

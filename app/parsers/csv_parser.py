@@ -68,13 +68,58 @@ class CSVParser:
             with open(self.filepath, "r", encoding=encoding,
                       errors="ignore" if encoding == "utf-8" and not sample else "strict",
                       newline="") as f:
-                reader = csv.DictReader(f, delimiter=delimiter)
-                for row in reader:
+                reader = csv.DictReader(f, delimiter=delimiter, strict=True)
+                fieldnames = reader.fieldnames or []
+                normalized_headers = [
+                    " ".join(str(field or "").strip().split()).casefold()
+                    for field in fieldnames
+                ]
+                if any(not header for header in normalized_headers):
+                    raise ParserError(
+                        "CSV header row contains an empty column name",
+                        user_message=(
+                            "The CSV header row contains an empty column name. "
+                            "Name every column and export it again."
+                        ),
+                        code="HEADER_REQUIRED",
+                    )
+                duplicates = sorted({
+                    header for header in normalized_headers
+                    if header and normalized_headers.count(header) > 1
+                })
+                if duplicates:
+                    raise ParserError(
+                        f"Duplicate CSV headers: {', '.join(duplicates)}",
+                        user_message=(
+                            "The CSV contains duplicate column names: "
+                            f"{', '.join(duplicates)}. Rename them and export again."
+                        ),
+                        code="DUPLICATE_HEADERS",
+                    )
+                for row_number, row in enumerate(reader, start=2):
+                    if None in row:
+                        raise ParserError(
+                            f"CSV row {row_number} has more values than its header",
+                            user_message=(
+                                f"CSV row {row_number} has more values than its "
+                                "header. Repair the export and try again."
+                            ),
+                            code="MALFORMED_CSV",
+                        )
                     cleaned = {}
                     for key, value in row.items():
                         if key is not None:
                             cleaned[key.strip()] = value.strip() if value else ""
                     rows.append(cleaned)
+        except csv.Error as e:
+            raise ParserError(
+                f"Malformed CSV {self.filepath}: {e}",
+                user_message=(
+                    "The CSV export is malformed. Re-export it with a standard "
+                    "comma- or tab-delimited table."
+                ),
+                code="MALFORMED_CSV",
+            ) from e
         except OSError as e:
             raise ParserError(f"Cannot read {self.filepath}: {e}",
                               user_message="The file could not be opened — is it "

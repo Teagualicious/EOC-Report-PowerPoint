@@ -113,7 +113,12 @@ def main(argv=None) -> int:
         data = args.fn(args)
     except Exception as exc:
         logging.getLogger(__name__).debug("CLI command failed", exc_info=True)
-        print(json.dumps({"ok": False, "error": str(exc)}, default=str))
+        print(json.dumps({
+            "ok": False,
+            "error": str(exc),
+            "user_message": getattr(exc, "user_message", str(exc)),
+            "code": getattr(exc, "code", None),
+        }, default=str))
         return 1
     print(json.dumps({"ok": True, "data": data}, default=str))
     return 0

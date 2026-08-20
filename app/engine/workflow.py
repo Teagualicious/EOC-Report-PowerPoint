@@ -1,13 +1,16 @@
 """Headless Deck Engine workflow service.
 
-The CLI and future Tk shell call only these functions. Fork Stage 0 establishes
-this dependency boundary; later stages implement parse, stage, and build behind
-these stable verbs. No function in this module imports Tk.
+The CLI and future dashboard call only these functions. Stage 1 implements
+profile-gated parsing behind ``parse_dump``; later stages implement staging
+and build behind the remaining stable verbs. No function in this module imports
+Tk.
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
+from datetime import date, datetime, time
 from typing import Any, Mapping
 
 from config.paths import (OUTPUT_DIR, PROJECT_ROOT, STAGING_DIR, TEMPLATES_DIR,
@@ -23,6 +26,12 @@ def _native(value: Any) -> Any:
         return {str(key): _native(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_native(item) for item in value]
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
+    if isinstance(value, set):
+        return sorted(_native(item) for item in value)
     item = getattr(value, "item", None)
     if callable(item) and not isinstance(value, (str, bytes)):
         try:
@@ -67,7 +76,7 @@ def describe_state() -> dict[str, Any]:
     ensure_dirs()
     return {
         "version": _version(),
-        "phase": "Fork Stage 0",
+        "phase": "Ingestion Stage 1",
         "analyst_ui_available": False,
         "paths": {
             "templates": TEMPLATES_DIR,
@@ -80,9 +89,138 @@ def describe_state() -> dict[str, Any]:
 
 
 def parse_dump(path: str, *, profile: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Parse one campaign export into Unified Data (implemented Stage 1)."""
-    del path, profile
-    raise NotImplementedError("Dump parsing is implemented in Fork Stage 1")
+    """Parse one export using a matching, explicitly approved import profile.
+
+    The first call for a new structure returns a compact ``profile_required``
+    result containing the fingerprint, structure descriptor, and deterministic
+    profile suggestion.  It does not return parser-built campaign rows.  Pass
+    that reviewed profile back to this function, or let a previously stored
+    ``profile_<fingerprint>.json`` be loaded automatically, to receive unified
+    data and reconciliation output.
+    """
+    from config.settings import (load_import_profile, save_import_profile)
+    from engine.campaign_dictionary import apply as apply_campaign_dictionary
+    from engine.data_pipeline import apply_platform_config
+    from engine.errors import ConfigError
+    from engine.ingestion import (flatten_unified_rows, inspect_source,
+                                  profile_path, reconcile_source,
+                                  structure_fingerprint,
+                                  suggest_import_profile,
+                                  validate_import_profile)
+
+    parsed, structure = inspect_source(path)
+    fingerprint = structure_fingerprint(structure)
+    suggestion = suggest_import_profile(structure, fingerprint)
+    stored_path = profile_path(fingerprint)
+
+    selected_profile = profile
+    loaded_from_disk = False
+    if selected_profile is None:
+        selected_profile = load_import_profile(fingerprint)
+        loaded_from_disk = selected_profile is not None
+
+    if selected_profile is None:
+        return _native({
+            "ok": False,
+            "status": "profile_required",
+            "profile_required": True,
+            "source": {
+                "file": parsed.get("source_file", os.path.basename(os.fspath(path))),
+                "type": structure.get("source_type", ""),
+                "extension": os.path.splitext(os.fspath(path))[1].lower(),
+            },
+            "source_file": parsed.get("source_file", os.path.basename(os.fspath(path))),
+            "fingerprint": fingerprint,
+            "structure_fingerprint": fingerprint,
+            "structure": structure,
+            "profile": suggestion,
+            "profile_path": stored_path,
+            "analyst_notes": [
+                "No approved import profile exists for this structure.",
+                "Review the suggested column roles before parsing the export.",
+            ],
+        })
+
+    try:
+        canonical_profile = validate_import_profile(
+            selected_profile, structure, fingerprint)
+    except ConfigError as exc:
+        # A stored profile can become stale or corrupted independently of the
+        # source.  Treat that case like a new profile request; an explicitly
+        # supplied bad profile remains an actionable configuration error.
+        if loaded_from_disk:
+            return _native({
+                "ok": False,
+                "status": "profile_required",
+                "profile_required": True,
+                "source_file": parsed.get("source_file", os.path.basename(os.fspath(path))),
+                "fingerprint": fingerprint,
+                "structure_fingerprint": fingerprint,
+                "structure": structure,
+                "profile": suggestion,
+                "profile_path": stored_path,
+                "profile_error": getattr(exc, "user_message", str(exc)),
+                "analyst_notes": [
+                    "The stored import profile is invalid for this structure.",
+                    "Review and save the suggested profile again.",
+                ],
+            })
+        raise
+
+    # Persist only a profile that passed fingerprint, schema, sheet, column,
+    # and role validation.  The write is deterministic and atomic in settings.
+    try:
+        saved_profile = save_import_profile(fingerprint, canonical_profile)
+    except OSError as exc:
+        raise ConfigError(
+            f"Could not save import profile {stored_path}: {exc}",
+            user_message=(
+                "The import profile could not be saved. Check that the workspace "
+                "is writable and try again."
+            ),
+            code="PROFILE_SAVE_FAILED",
+        ) from exc
+
+    apply_platform_config(parsed, saved_profile)
+    unified_rows = flatten_unified_rows(parsed)
+    unified_rows, dictionary_notes = apply_campaign_dictionary(unified_rows)
+    reconciliation = reconcile_source(
+        parsed, structure, saved_profile, unified_rows)
+
+    source_hash = hashlib.sha256()
+    try:
+        with open(os.fspath(path), "rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                source_hash.update(block)
+    except OSError as exc:
+        raise OSError(f"Could not hash source export {path}: {exc}") from exc
+
+    result = dict(parsed)
+    result.update({
+        "ok": True,
+        "status": "parsed",
+        "profile_required": False,
+        "source": {
+            "file": parsed.get("source_file", os.path.basename(os.fspath(path))),
+            "type": structure.get("source_type", ""),
+            "extension": os.path.splitext(os.fspath(path))[1].lower(),
+            "sha256": source_hash.hexdigest(),
+        },
+        "source_type": structure.get("source_type", ""),
+        "structure": structure,
+        "fingerprint": fingerprint,
+        "structure_fingerprint": fingerprint,
+        "profile": saved_profile,
+        "profile_path": stored_path,
+        "unified_rows": unified_rows,
+        "campaign_dictionary": {
+            "version": "v0",
+            "notes": dictionary_notes,
+        },
+        "analyst_notes": dictionary_notes,
+        "reconciliation": reconciliation,
+    })
+    return _native(result)
 
 
 def generate_staging(dump_path: str, template_name: str | None = None) -> dict[str, Any]:
