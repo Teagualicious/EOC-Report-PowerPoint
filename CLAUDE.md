@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Instructions for coding sessions in the Deck Engine repository. Read `STATUS.md` before changing anything and use `documentation/DECK_ENGINE_BUILDOUT.md` as the authoritative staged specification.
+Instructions for coding sessions in the Deck Engine repository. Read `STATUS.md` before changing anything, then `documentation/HANDOFF.md` for context/architecture/decisions, and use `documentation/DECK_ENGINE_BUILDOUT.md` as the authoritative staged specification. `documentation/DOCUMENTATION_STANDARDS.md` and `documentation/TESTING_STANDARDS.md` are binding.
 
 ## Product
 

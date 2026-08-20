@@ -17,7 +17,7 @@ The analyst desktop application intentionally does not launch yet. The available
 python -m app.cli list-templates
 ```
 
-The complete staged implementation plan is [`documentation/DECK_ENGINE_BUILDOUT.md`](documentation/DECK_ENGINE_BUILDOUT.md). Upstream documentation and the EOC requirements review are retained under [`documentation/upstream/`](documentation/upstream/).
+The project handoff — context, architecture, decisions, and phase plan — is [`documentation/HANDOFF.md`](documentation/HANDOFF.md); the staged gates live in [`documentation/DECK_ENGINE_BUILDOUT.md`](documentation/DECK_ENGINE_BUILDOUT.md). Archived upstream documentation is retained under [`documentation/upstream/`](documentation/upstream/).
 
 ## Development
 

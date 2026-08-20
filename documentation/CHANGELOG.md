@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.1.0-dev — Fork Stage 0: surgery and architecture harness
+## 0.1.0-dev (2026-08-20) — Planning pass: handoff, standards, dashboard direction
+
+- Added `documentation/HANDOFF.md` (context, architecture map, decisions DEC-1…DEC-8, phase plan, pickup guide).
+- Amended `documentation/DECK_ENGINE_BUILDOUT.md`: Stage 5 analyst UI is now a localhost web dashboard (replacing the planned Tkinter window); Stage 4 gains the interim Spectrum-branded default template and literal chart-data rule; Stage 6 launcher starts the dashboard.
+- Added binding `documentation/DOCUMENTATION_STANDARDS.md` and `documentation/TESTING_STANDARDS.md`; updated the documentation index and `CLAUDE.md` reading order.
+- Plan reviewed by a three-lens adversarial panel before publish; report in `documentation/reviews/HANDOFF_REVIEW_2026-08-20.md`, all blocker/major findings fixed in the same pass.
+- No application or test code changed; survivor baseline remains 313 tests.
+
+## 0.1.0-dev (2026-08-10) — Fork Stage 0: surgery and architecture harness
 
 - Established the exact Jughead v1.36.0 fork baseline and recorded its 367-test result.
 - Removed the MCP server, searchable Excel/VBA export path, PowerPoint live COM preview, and inherited multi-window analyst workflow.
