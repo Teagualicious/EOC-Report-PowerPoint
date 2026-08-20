@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-dev (2026-08-20) — Stage 1: deterministic ingestion core
+## 0.1.0 (2026-08-20) — Stage 1: deterministic ingestion core
 
 - Added `engine.ingestion` structure inspection, order-independent fingerprints,
   schema-versioned import profiles, explicit profile-required refusal, and source
@@ -10,6 +10,8 @@
 - Added the v0 campaign-dictionary identity passthrough and shared deterministic
   synthetic fixture factory for all supported export formats.
 - Added malformed CSV/header checks and Stage 1 contract/performance coverage.
+- Release automation now accepts only pushed `vMAJOR.MINOR.PATCH` tags that match
+  `VERSION`, publishing `Deck-Engine-v<version>.zip` and the portable Windows archive.
 - Verification: `python -m pytest -q` — **322 passed**; no Windows/Office checks
   were performed.
 

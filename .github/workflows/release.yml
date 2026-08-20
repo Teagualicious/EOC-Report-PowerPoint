@@ -2,12 +2,12 @@ name: Release
 
 on:
   push:
-    branches: [main]
-    paths: [VERSION]
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Release tag override (defaults to VERSION)"
+        description: "Release version (v prefix optional; defaults to VERSION)"
         required: false
 
 permissions:
@@ -19,19 +19,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve version
+      - name: Resolve and validate release version
         id: version
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          VERSION="${{ inputs.version }}"
-          [ -n "$VERSION" ] || VERSION="$(tr -d ' \r\n' < VERSION)"
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" == *dev* ]]; then
+          set -euo pipefail
+
+          if [[ -n "$INPUT_VERSION" ]]; then
+            RELEASE_VERSION="${INPUT_VERSION#v}"
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            RELEASE_VERSION="${REF_NAME#v}"
+          else
+            RELEASE_VERSION="$(tr -d ' \r\n' < VERSION)"
+          fi
+
+          if [[ "$RELEASE_VERSION" == *dev* ]]; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "Development VERSION detected; no release will be published."
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a semantic version like 0.1.0; got '$RELEASE_VERSION'." >&2
+            exit 1
+          fi
+
+          TAG="v$RELEASE_VERSION"
+          FILE_VERSION="$(tr -d ' \r\n' < VERSION)"
+
+          if [[ "$REF_TYPE" == "tag" && "$REF_NAME" != "$TAG" ]]; then
+            echo "Pushed tag '$REF_NAME' does not match required tag '$TAG'." >&2
+            exit 1
+          fi
+
+          if [[ "$REF_TYPE" == "tag" && "$FILE_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "Tag '$TAG' does not match VERSION '$FILE_VERSION'." >&2
+            exit 1
+          fi
+
+          echo "value=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python 3.12
         if: steps.version.outputs.publish == 'true'
@@ -43,20 +75,22 @@ jobs:
         if: steps.version.outputs.publish == 'true'
         shell: bash
         run: |
+          set -euo pipefail
           VER="${{ steps.version.outputs.value }}"
           mkdir -p build/src
           git archive HEAD | tar -x -C build/src
-          (cd build/src && zip -qr "$GITHUB_WORKSPACE/DeckEngine-$VER.zip" .)
+          (cd build/src && zip -qr "$GITHUB_WORKSPACE/Deck-Engine-v$VER.zip" .)
           mkdir -p build/src/wheelhouse
-          python -m pip download -r app/requirements.txt -d build/src/wheelhouse \
+          python -m pip download -r build/src/app/requirements.txt -d build/src/wheelhouse \
             --platform win_amd64 --python-version 312 --only-binary=:all:
           (cd build/src && zip -qr \
-            "$GITHUB_WORKSPACE/DeckEngine-$VER-portable-win64.zip" .)
+            "$GITHUB_WORKSPACE/Deck-Engine-v$VER-portable-win64.zip" .)
 
       - name: Extract release notes
         if: steps.version.outputs.publish == 'true'
         shell: bash
         run: |
+          set -euo pipefail
           awk '/^## /{n++} n==1' documentation/CHANGELOG.md > release_notes.md
           test -s release_notes.md || echo "See documentation/CHANGELOG.md." > release_notes.md
 
@@ -66,13 +100,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
           VER="${{ steps.version.outputs.value }}"
-          if gh release view "$VER" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "$VER already exists; replacing archive assets only."
+          TAG="${{ steps.version.outputs.tag }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$TAG already exists; replacing archive assets only."
           else
-            gh release create "$VER" --target "$GITHUB_SHA" \
-              --title "Deck Engine $VER" --notes-file release_notes.md
+            gh release create "$TAG" --target "$GITHUB_SHA" \
+              --title "Deck-Engine-v$VER" --notes-file release_notes.md
           fi
-          gh release upload "$VER" --repo "$GITHUB_REPOSITORY" \
-            "DeckEngine-$VER.zip" \
-            "DeckEngine-$VER-portable-win64.zip" --clobber
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
+            "Deck-Engine-v$VER.zip" \
+            "Deck-Engine-v$VER-portable-win64.zip" --clobber

@@ -100,6 +100,13 @@ Produce a self-contained survivor codebase before implementing new product behav
   payloads are literal workbook content.** Full text: `documentation/HANDOFF.md` §3–4.
 - **2026-08-10 — Upstream history retained.** The target repository already points at the exact v1.36.0 donor commit, so the fork branch is based directly on it rather than re-importing code as an unrelated root.
 - **2026-08-10 — Development VERSIONs never release.** `0.1.0-dev` and later `*-dev` versions are CI/test artifacts; the release workflow exits before publishing them.
+- **2026-08-20 — Release naming and trigger.** Releases are created only from a pushed
+  `vMAJOR.MINOR.PATCH` tag whose stripped value matches `VERSION`; development versions
+  remain blocked. Release titles use `Deck-Engine-v<version>` and assets use
+  `Deck-Engine-v<version>.zip` plus `Deck-Engine-v<version>-portable-win64.zip`.
+- **2026-08-20 — Initial engineering release.** The owner authorized promoting the
+  Stage 1 `0.1.0-dev` build to `v0.1.0`; no Windows/Office acceptance was performed,
+  so this release does not claim clean-machine or desktop-Office acceptance.
 - **2026-08-10 — Synthetic-first Stage 1.** No sanitized real dump was attached. The plan explicitly permits the deterministic synthetic factory while naming first contact with real data as a risk.
 - **2026-08-10 — Mapper is static and developer-only.** The COM live-preview module is removed; mapping and fills remain available through python-pptx.
 

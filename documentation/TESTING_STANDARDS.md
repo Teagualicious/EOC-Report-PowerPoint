@@ -105,4 +105,5 @@ These are a **floor**, not the closing condition — the stage's gate paragraph 
 CI runs on every push/PR (ubuntu, Python 3.12): install → pytest. Keep it green; a red
 main is the top priority. Windows/Office claims are out of CI's reach by definition —
 Linux CI **may not** claim Windows acceptance (see `CLAUDE.md`). Release publishing stays
-gated on `VERSION` not containing `dev`.
+gated on a pushed `vMAJOR.MINOR.PATCH` tag matching `VERSION` and not containing `dev`;
+published titles and archives use the `Deck-Engine-v<version>` convention.
